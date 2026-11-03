@@ -3,7 +3,7 @@
 An early-warning decision-support and dispatch system for municipal dengue vector control. AeDispatch gives every barangay a threat score built from five kinds of data, ranks the barangays from highest to lowest threat, and recommends where the health office should send its limited field teams first. A health officer confirms or rejects every recommendation; nothing is dispatched automatically.
 
 Course project for CS117 Software Engineering 1, BS Computer Science, Bicol University.
-Team WBB: Clint John Bonagua, Rhea Nicole Lumbes, John Irish Milallos.
+Team MuskiThree: Clint John Bonagua, Rhea Nicole Lumbes, John Irish Milallos.
 
 ## What the prototype shows
 
