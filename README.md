@@ -30,10 +30,10 @@ Five factors, each from 0 to 1, with starting weights:
 
 | Factor | Starting weight |
 | --- | --- |
-| Weather (temperature, rainfall) | 25% |
-| Household and community reports | 20% |
+| Weather (temperature, rainfall) | 20% |
+| Household and community reports | 15% |
 | Anonymous symptom checks | 10% |
-| BHW field findings | 15% |
+| BHW field findings | 25% |
 | Confirmed cases | 30% |
 
 The weighted sum is adjusted for population density and shown on a 0–100 scale. Recommended action: Tier 1 (Search and Destroy / larviciding) from a score of 40; Tier 2 (fogging review) only when a purok has more than two confirmed cases.
