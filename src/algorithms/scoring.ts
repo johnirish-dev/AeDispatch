@@ -241,7 +241,9 @@ export function symptomIndex(
 // ---------------------------------------------------------------------------
 
 export interface FieldInput {
-  /** Containers inspected in the surveys of the last 14 days. */
+  /** Surveys submitted in the last 14 days. 0 means nobody inspected the barangay. */
+  surveys: number;
+  /** Containers inspected in those surveys. */
   containers: number;
   /** Containers positive for larvae or pupae. */
   positive: number;
@@ -251,28 +253,36 @@ export interface FieldInput {
 
 export interface FieldResult {
   index: number;
+  /** False when there was no recent survey and the prior stands in. */
+  surveyed: boolean;
+  surveys: number;
   containers: number;
   positive: number;
+  /** The prior that was used (it is the whole index when nothing was surveyed). */
+  prior: number;
 }
 
 /**
- * Returns null when there was no survey in the window: the field factor is
- * then left out of the score and the other weights are scaled up.
+ * With no survey the index is the prior: (0 + m * prior) / (0 + m). The field
+ * factor keeps its normal weight for every barangay, so scores stay
+ * comparable. Dropping the factor and scaling up the others would inflate
+ * exactly the barangays nobody has inspected.
+ * `surveyed` lets the breakdown say "no recent survey, prior used".
  */
-export function fieldIndex(
-  input: FieldInput | null,
-  p: ModelParameters,
-): FieldResult | null {
-  if (input === null) return null;
+export function fieldIndex(input: FieldInput, p: ModelParameters): FieldResult {
+  const surveys = nonNegative(input.surveys);
   const containers = nonNegative(input.containers);
   const positive = Math.min(nonNegative(input.positive), containers);
-  const index = smoothedRate(
-    positive,
+  const prior = input.prior ?? p.constants.priors.field;
+  const index = smoothedRate(positive, containers, prior, p.constants.smoothing.field);
+  return {
+    index: clamp01(index),
+    surveyed: surveys > 0,
+    surveys,
     containers,
-    input.prior ?? p.constants.priors.field,
-    p.constants.smoothing.field,
-  );
-  return { index: clamp01(index), containers, positive };
+    positive,
+    prior,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -322,19 +332,16 @@ export interface Indices {
   weather: number;
   household: number;
   symptom: number;
-  /** null when there was no recent survey. */
-  field: number | null;
+  field: number;
   cases: number;
 }
 
 export interface FactorBreakdown {
-  /** The index in [0,1]; null for an omitted factor. */
-  index: number | null;
-  /** The weight stored in the parameters. */
-  weightConfigured: number;
-  /** The weight actually used (rescaled so the used weights add up to 1). */
-  weightUsed: number;
-  /** Points this factor adds on the 0-100 scale: 100 * weightUsed * index. */
+  /** The index in [0,1]. */
+  index: number;
+  /** The weight from the parameters. It is the same for every barangay. */
+  weight: number;
+  /** Points this factor adds on the 0-100 scale: 100 * weight * index. */
   points: number;
 }
 
@@ -346,7 +353,6 @@ export interface ScoreBreakdown {
     field: FactorBreakdown;
     cases: FactorBreakdown;
   };
-  fieldOmitted: boolean;
   /** Sum of the factor points, before the density adjustment (0-100). */
   subtotal: number;
   /** Density ratio (this barangay's density / the highest density), in [0,1]. */
@@ -371,27 +377,21 @@ const FACTOR_NAMES = [
 /**
  * T = (sum of weight * index) * (1 + lambda * rho) / (1 + lambda)
  *
- * If the field index is missing, its weight is dropped and the remaining
- * weights are divided by their sum, so they again add up to 100%.
+ * The weights are the same for every barangay. A missing signal is handled
+ * inside its own index (by the prior), never by moving weight onto the others.
  */
 export function computeThreatScore(
   indices: Indices,
   densityRatio: number,
   p: ModelParameters,
 ): ScoreBreakdown {
-  const weightsSum = FACTOR_NAMES.reduce(
-    (sum, name) => (indices[name] === null ? sum : sum + p.weights[name]),
-    0,
-  );
-
   const factors = {} as ScoreBreakdown["factors"];
   let subtotal = 0;
   for (const name of FACTOR_NAMES) {
     const index = indices[name];
-    const weightConfigured = p.weights[name];
-    const weightUsed = index === null ? 0 : weightConfigured / weightsSum;
-    const points = index === null ? 0 : 100 * weightUsed * index;
-    factors[name] = { index, weightConfigured, weightUsed, points };
+    const weight = p.weights[name];
+    const points = 100 * weight * index;
+    factors[name] = { index, weight, points };
     subtotal += points;
   }
 
@@ -402,7 +402,6 @@ export function computeThreatScore(
   const score = clamp01((subtotal / 100) * densityFactor);
   return {
     factors,
-    fieldOmitted: indices.field === null,
     subtotal,
     densityRatio: rho,
     densityFactor,
@@ -423,8 +422,8 @@ export interface BarangayInputs {
   weather: WeatherInput;
   household: HouseholdInput;
   symptoms: SymptomInput;
-  /** null when there was no survey in the last 14 days. */
-  field: FieldInput | null;
+  /** Pass surveys = 0 when there was no survey in the last 14 days. */
+  field: FieldInput;
   cases: CaseInput;
 }
 
@@ -433,7 +432,7 @@ export interface ScoreDetails {
   weather: WeatherResult;
   household: HouseholdResult;
   symptom: SymptomResult;
-  field: FieldResult | null;
+  field: FieldResult;
   cases: CaseResult;
 }
 
@@ -458,7 +457,7 @@ export function scoreBarangay(
       weather: details.weather.index,
       household: details.household.index,
       symptom: details.symptom.index,
-      field: details.field === null ? null : details.field.index,
+      field: details.field.index,
       cases: details.cases.index,
     },
     inputs.densityRatio,

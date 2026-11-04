@@ -194,22 +194,34 @@ describe("symptomIndex", () => {
 });
 
 describe("fieldIndex", () => {
-  it("is omitted (null) when there is no survey", () => {
-    expect(fieldIndex(null, P)).toBeNull();
+  const noSurvey = { surveys: 0, containers: 0, positive: 0 };
+
+  it("uses the global prior when nobody was surveyed", () => {
+    const r = fieldIndex(noSurvey, P);
+    expect(r.surveyed).toBe(false);
+    expect(r.index).toBeCloseTo(P.constants.priors.field, 10);
+    expect(r.prior).toBe(P.constants.priors.field);
+  });
+  it("uses the barangay's trailing rate as the prior when given", () => {
+    const r = fieldIndex({ ...noSurvey, prior: 0.3 }, P);
+    expect(r.surveyed).toBe(false);
+    expect(r.index).toBeCloseTo(0.3, 10);
   });
   it("smooths the share of positive containers", () => {
     // 6 of 60, prior 0.1: (6 + 1) / 70
-    const r = fieldIndex({ containers: 60, positive: 6, prior: 0.1 }, P);
-    expect(r?.index).toBeCloseTo(0.1, 10);
+    const r = fieldIndex({ surveys: 4, containers: 60, positive: 6, prior: 0.1 }, P);
+    expect(r.surveyed).toBe(true);
+    expect(r.index).toBeCloseTo(0.1, 10);
   });
-  it("falls back to the prior when a survey found no containers", () => {
-    const r = fieldIndex({ containers: 0, positive: 0, prior: 0.3 }, P);
-    expect(r?.index).toBeCloseTo(0.3, 10);
+  it("still counts as surveyed when the survey found no containers", () => {
+    const r = fieldIndex({ surveys: 1, containers: 0, positive: 0, prior: 0.3 }, P);
+    expect(r.surveyed).toBe(true);
+    expect(r.index).toBeCloseTo(0.3, 10);
   });
   it("cannot count more positive containers than inspected", () => {
-    const r = fieldIndex({ containers: 10, positive: 99, prior: 0 }, P);
-    expect(r?.positive).toBe(10);
-    expect(r?.index).toBeCloseTo(0.5, 10); // 10 / 20
+    const r = fieldIndex({ surveys: 1, containers: 10, positive: 99, prior: 0 }, P);
+    expect(r.positive).toBe(10);
+    expect(r.index).toBeCloseTo(0.5, 10); // 10 / 20
   });
 });
 
@@ -272,18 +284,15 @@ describe("computeThreatScore", () => {
     expect(computeThreatScore(all, -2, P).densityRatio).toBe(0);
   });
 
-  it("omits the field factor and rescales the other weights to 100%", () => {
-    const r = computeThreatScore({ ...all, field: null }, 1, P);
-    expect(r.fieldOmitted).toBe(true);
-    expect(r.factors.field.weightUsed).toBe(0);
-    expect(r.factors.field.points).toBe(0);
-    // 0.20 / 0.75, 0.15 / 0.75, 0.10 / 0.75, 0.30 / 0.75
-    expect(r.factors.weather.weightUsed).toBeCloseTo(0.2 / 0.75, 10);
-    expect(r.factors.cases.weightUsed).toBeCloseTo(0.3 / 0.75, 10);
-    const used = Object.values(r.factors).reduce((s, f) => s + f.weightUsed, 0);
-    expect(used).toBeCloseTo(1, 10);
-    // all other indices are 1, so the subtotal is still 100
-    expect(r.subtotal).toBeCloseTo(100, 10);
+  it("always uses the configured weights, whatever the field index is", () => {
+    const r = computeThreatScore({ ...all, field: 0 }, 1, P);
+    expect(r.factors.weather.weight).toBe(0.2);
+    expect(r.factors.household.weight).toBe(0.15);
+    expect(r.factors.symptom.weight).toBe(0.1);
+    expect(r.factors.field.weight).toBe(0.25);
+    expect(r.factors.cases.weight).toBe(0.3);
+    // The other four factors are not boosted: 100 - 25 points from the field.
+    expect(r.subtotal).toBeCloseTo(75, 10);
   });
 
   it("uses the weights it is given, not fixed numbers", () => {
@@ -366,7 +375,7 @@ describe("worked example: Penafrancia", () => {
       reportsPrior: 0.6,
     },
     symptoms: { warningChecks: 2, totalChecks: 9, population: 4120 },
-    field: { containers: 60, positive: 6, prior: 0.1 },
+    field: { surveys: 4, containers: 60, positive: 6, prior: 0.1 },
     cases: { thisWeek: 3, lastWeek: 1, population: 4120 },
   };
 
@@ -378,7 +387,7 @@ describe("worked example: Penafrancia", () => {
     expect(r.details.household.index).toBeCloseTo(0.6, 6);
     expect(r.details.household.confidence).toBe("good");
     expect(r.details.symptom.index).toBeCloseTo(0.48544, 4);
-    expect(r.details.field?.index).toBeCloseTo(0.1, 6);
+    expect(r.details.field.index).toBeCloseTo(0.1, 6);
     expect(r.details.cases.index).toBeCloseTo(0.9551, 4);
 
     expect(r.factors.weather.points).toBeCloseTo(18.545, 2);
@@ -394,12 +403,59 @@ describe("worked example: Penafrancia", () => {
     expect(r.paramsVersion).toBe(1);
   });
 
-  it("drops the field factor and rescales when there is no recent survey", () => {
-    const r = scoreBarangay({ ...penafrancia, field: null }, P);
-    expect(r.fieldOmitted).toBe(true);
-    expect(r.details.field).toBeNull();
-    const used = Object.values(r.factors).reduce((s, f) => s + f.weightUsed, 0);
-    expect(used).toBeCloseTo(1, 10);
+  it("uses the prior, not boosted weights, when there is no recent survey", () => {
+    const noSurvey = scoreBarangay(
+      { ...penafrancia, field: { surveys: 0, containers: 0, positive: 0 } },
+      P,
+    );
+    expect(noSurvey.details.field.surveyed).toBe(false);
+    expect(noSurvey.details.field.index).toBeCloseTo(0.15, 10); // global prior
+    expect(noSurvey.factors.field.weight).toBe(0.25);
+    expect(noSurvey.factors.weather.weight).toBe(0.2);
+    // Field points: 0.15 * 25 = 3.75 instead of 2.5 -> subtotal 64.803
+    expect(noSurvey.subtotal).toBeCloseTo(64.803, 2);
+    expect(noSurvey.score100).toBe(64);
+  });
+
+  it("scores a surveyed and an unsurveyed barangay on the same weights", () => {
+    const surveyed = scoreBarangay(penafrancia, P);
+    const unsurveyed = scoreBarangay(
+      { ...penafrancia, field: { surveys: 0, containers: 0, positive: 0, prior: 0.1 } },
+      P,
+    );
+    // Same prior (0.1) as the surveyed barangay's own rate: identical scores.
+    expect(unsurveyed.score).toBeCloseTo(surveyed.score, 10);
+  });
+
+  it("no survey can lift a score by at most the prior's share of the field weight", () => {
+    // A thoroughly clean survey: (0 + 10 * 0.15) / (100 + 10) = 0.0136
+    const clean = scoreBarangay(
+      { ...penafrancia, field: { surveys: 3, containers: 100, positive: 0 } },
+      P,
+    );
+    const unsurveyed = scoreBarangay(
+      { ...penafrancia, field: { surveys: 0, containers: 0, positive: 0 } },
+      P,
+    );
+    // The gap is the field-index difference times its 25-point weight, shrunk
+    // by the density factor: (0.15 - 0.0136) * 25 * 0.9833 = about 3.35 points.
+    // Never the +18 points that rescaling the other weights used to give.
+    const gap = (unsurveyed.score - clean.score) * 100;
+    expect(gap).toBeGreaterThan(0);
+    expect(gap).toBeCloseTo(3.35, 1);
+    expect(gap).toBeLessThan(0.15 * 25);
+  });
+
+  it("more positive containers raise the score", () => {
+    const low = scoreBarangay(
+      { ...penafrancia, field: { surveys: 1, containers: 60, positive: 3 } },
+      P,
+    );
+    const high = scoreBarangay(
+      { ...penafrancia, field: { surveys: 1, containers: 60, positive: 30 } },
+      P,
+    );
+    expect(high.score).toBeGreaterThan(low.score);
   });
 
   it("refuses to score with invalid parameters", () => {

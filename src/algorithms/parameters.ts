@@ -35,7 +35,10 @@ export interface Constants {
   // --- Household index ---
   /** Pseudo-observations that keep small samples near the prior. */
   smoothing: { answers: number; reports: number; field: number };
-  /** Rate used when a barangay has no trailing history of its own. */
+  /**
+   * Rate used when a barangay has no trailing history of its own. The field
+   * prior also stands in for a barangay with no recent survey.
+   */
   priors: { answers: number; reports: number; field: number };
   /** How the household index mixes daily answers and household reports. Adds up to 1. */
   householdBlend: { answers: number; reports: number };
