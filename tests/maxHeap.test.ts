@@ -1,152 +1,192 @@
 import { describe, it, expect } from 'vitest';
-import { MaxHeap, HeapItem } from '../src/algorithms/maxHeap';
+import { MaxHeap } from '../src/algorithms/maxHeap';
 
-function verifyHeapInvariants(heap: MaxHeap) {
-  const arr = heap._test_getHeapArray();
-  const pos = heap._test_getPosMap();
-  
-  expect(arr.length).toBe(pos.size);
-  
-  for (let i = 0; i < arr.length; i++) {
-    const item = arr[i];
-    expect(pos.get(item.barangayId)).toBe(i); // pos map accurate
-    
-    const left = 2 * i + 1;
-    const right = 2 * i + 2;
-    
-    // Parent >= children invariant (accounting for deterministic string tie-breaker)
-    if (left < arr.length) {
-      const cmp = arr[left].score !== item.score 
-        ? arr[left].score - item.score 
-        : item.barangayId.localeCompare(arr[left].barangayId);
-      expect(cmp).toBeLessThanOrEqual(0);
-    }
-    
-    if (right < arr.length) {
-      const cmp = arr[right].score !== item.score 
-        ? arr[right].score - item.score 
-        : item.barangayId.localeCompare(arr[right].barangayId);
-      expect(cmp).toBeLessThanOrEqual(0);
-    }
-  }
+// Small seeded generator so a failing random test can be reproduced.
+function seededRandom(seed: number): () => number {
+  let a = seed;
+  return () => {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }
 
-describe('MaxHeap', () => {
-  it('handles build, peek, and extractMax in correct order', () => {
-    const heap = new MaxHeap();
-    heap.build([
-      { barangayId: 'A', score: 30 },
-      { barangayId: 'B', score: 70 },
-      { barangayId: 'C', score: 40 },
-    ]);
-    
-    expect(heap.size()).toBe(3);
-    verifyHeapInvariants(heap);
-    
-    expect(heap.peek()?.barangayId).toBe('B');
-    expect(heap.extractMax()?.barangayId).toBe('B');
-    expect(heap.size()).toBe(2);
-    expect(heap.extractMax()?.barangayId).toBe('C');
-    expect(heap.extractMax()?.barangayId).toBe('A');
-    expect(heap.extractMax()).toBeNull();
+// Reference ranking: score descending, then id ascending.
+function sortedReference(model: Map<string, number>): { id: string; score: number }[] {
+  return [...model.entries()]
+    .map(([id, score]) => ({ id, score }))
+    .sort((a, b) => b.score - a.score || (a.id < b.id ? -1 : 1));
+}
+
+function heapWith(entries: [string, number][]): MaxHeap {
+  const h = new MaxHeap();
+  h.build(entries.map(([id, score]) => ({ id, score })));
+  return h;
+}
+
+describe('MaxHeap basics', () => {
+  it('builds from entries and returns the maximum', () => {
+    const h = heapWith([['a', 10], ['b', 50], ['c', 30], ['d', 40]]);
+    expect(h.size).toBe(4);
+    expect(h.peek()).toEqual({ id: 'b', score: 50 });
+    expect(h.isValid()).toBe(true);
   });
 
-  it('updates keys correctly with sift up and sift down', () => {
-    const heap = new MaxHeap();
-    heap.updateKey('X', 10);
-    heap.updateKey('Y', 20);
-    heap.updateKey('Z', 5);
-    
-    expect(heap.peek()?.barangayId).toBe('Y');
-    
-    // Sift up
-    heap.updateKey('Z', 50);
-    expect(heap.peek()?.barangayId).toBe('Z');
-    verifyHeapInvariants(heap);
-    
-    // Sift down
-    heap.updateKey('Z', 2);
-    expect(heap.peek()?.barangayId).toBe('Y');
-    verifyHeapInvariants(heap);
+  it('extractMax returns entries from highest to lowest', () => {
+    const h = heapWith([['a', 10], ['b', 50], ['c', 30], ['d', 40]]);
+    const order = [h.extractMax(), h.extractMax(), h.extractMax(), h.extractMax()];
+    expect(order.map((e) => e?.id)).toEqual(['b', 'd', 'c', 'a']);
+    expect(h.size).toBe(0);
   });
 
-  it('extracts topK without mutating live heap', () => {
-    const heap = new MaxHeap();
-    heap.build([
-      { barangayId: 'B1', score: 10 },
-      { barangayId: 'B2', score: 50 },
-      { barangayId: 'B3', score: 30 },
-      { barangayId: 'B4', score: 40 },
-      { barangayId: 'B5', score: 20 },
-    ]);
-    
-    const top3 = heap.topK(3);
-    expect(top3).toEqual([
-      { barangayId: 'B2', score: 50 },
-      { barangayId: 'B4', score: 40 },
-      { barangayId: 'B3', score: 30 },
-    ]);
-    
-    // Size should remain unchanged
-    expect(heap.size()).toBe(5);
+  it('updateKey inserts a new id', () => {
+    const h = new MaxHeap();
+    h.updateKey('a', 5);
+    h.updateKey('b', 9);
+    expect(h.has('b')).toBe(true);
+    expect(h.peek()?.id).toBe('b');
   });
 
-  it('handles edge cases for topK', () => {
-    const heap = new MaxHeap();
-    expect(heap.topK(5)).toEqual([]);
-    
-    heap.updateKey('A', 10);
-    expect(heap.topK(0)).toEqual([]);
-    expect(heap.topK(5).length).toBe(1); // k > n
+  it('updateKey moves an entry up and down', () => {
+    const h = heapWith([['a', 10], ['b', 50], ['c', 30]]);
+    h.updateKey('a', 90);
+    expect(h.peek()?.id).toBe('a');
+    h.updateKey('a', 1);
+    expect(h.peek()?.id).toBe('b');
+    expect(h.isValid()).toBe(true);
   });
 
-  it('removes elements successfully', () => {
-    const heap = new MaxHeap();
-    heap.build([
-      { barangayId: 'B1', score: 10 },
-      { barangayId: 'B2', score: 50 }, // Root
-      { barangayId: 'B3', score: 30 }
-    ]);
-    
-    heap.remove('B2'); // Remove root
-    expect(heap.size()).toBe(2);
-    expect(heap.peek()?.barangayId).toBe('B3');
-    verifyHeapInvariants(heap);
-    
-    heap.remove('Missing'); // Ignore safely
-    expect(heap.size()).toBe(2);
-    
-    heap.remove('B1'); // Remove leaf
-    expect(heap.size()).toBe(1);
-    verifyHeapInvariants(heap);
+  it('updateKey with the same score changes nothing', () => {
+    const h = heapWith([['a', 10], ['b', 50], ['c', 30]]);
+    h.updateKey('c', 30);
+    expect(h.topK(3).map((e) => e.id)).toEqual(['b', 'c', 'a']);
+    expect(h.isValid()).toBe(true);
   });
 
-  it('maintains invariants through randomized operation sequences', () => {
+  it('remove works for the root, a middle entry and a leaf', () => {
+    const h = heapWith([['a', 10], ['b', 50], ['c', 30], ['d', 40], ['e', 20]]);
+    expect(h.remove('b')).toBe(true); // root
+    expect(h.remove('c')).toBe(true); // middle
+    expect(h.remove('a')).toBe(true); // leaf
+    expect(h.isValid()).toBe(true);
+    expect(h.topK(5).map((e) => e.id)).toEqual(['d', 'e']);
+    expect(h.has('b')).toBe(false);
+  });
+
+  it('remove of an unknown id returns false', () => {
+    const h = heapWith([['a', 1]]);
+    expect(h.remove('zzz')).toBe(false);
+    expect(h.size).toBe(1);
+  });
+});
+
+describe('MaxHeap edge cases', () => {
+  it('handles an empty heap', () => {
+    const h = new MaxHeap();
+    expect(h.peek()).toBeUndefined();
+    expect(h.extractMax()).toBeUndefined();
+    expect(h.topK(3)).toEqual([]);
+    expect(h.size).toBe(0);
+  });
+
+  it('build with an empty list gives an empty heap', () => {
+    const h = heapWith([['a', 1]]);
+    h.build([]);
+    expect(h.size).toBe(0);
+    expect(h.has('a')).toBe(false);
+    expect(h.isValid()).toBe(true);
+  });
+
+  it('build replaces earlier contents', () => {
+    const h = heapWith([['a', 1], ['b', 2]]);
+    h.build([{ id: 'x', score: 7 }]);
+    expect(h.size).toBe(1);
+    expect(h.has('a')).toBe(false);
+  });
+
+  it('build rejects duplicate ids', () => {
+    const h = new MaxHeap();
+    expect(() =>
+      h.build([{ id: 'a', score: 1 }, { id: 'a', score: 2 }]),
+    ).toThrow();
+  });
+
+  it('topK handles k = 0, negative k and k larger than size', () => {
+    const h = heapWith([['a', 10], ['b', 20]]);
+    expect(h.topK(0)).toEqual([]);
+    expect(h.topK(-1)).toEqual([]);
+    expect(h.topK(99).map((e) => e.id)).toEqual(['b', 'a']);
+  });
+
+  it('topK does not change the live heap', () => {
+    const h = heapWith([['a', 10], ['b', 50], ['c', 30], ['d', 40]]);
+    h.topK(3);
+    expect(h.size).toBe(4);
+    expect(h.peek()?.id).toBe('b');
+    expect(h.isValid()).toBe(true);
+  });
+
+  it('peek returns a copy, so callers cannot corrupt the heap', () => {
+    const h = heapWith([['a', 10], ['b', 50]]);
+    const top = h.peek();
+    if (top) top.score = -1;
+    expect(h.peek()?.score).toBe(50);
+  });
+});
+
+describe('MaxHeap tie-breaking', () => {
+  it('ranks equal scores by smaller id first', () => {
+    const h = heapWith([['c', 5], ['a', 5], ['b', 5]]);
+    expect(h.topK(3).map((e) => e.id)).toEqual(['a', 'b', 'c']);
+    expect(h.extractMax()?.id).toBe('a');
+  });
+
+  it('keeps the tie-break after updateKey', () => {
+    const h = heapWith([['a', 1], ['b', 5], ['c', 9]]);
+    h.updateKey('c', 5);
+    expect(h.topK(3).map((e) => e.id)).toEqual(['b', 'c', 'a']);
+  });
+
+  it('works with numeric ids', () => {
+    const h = new MaxHeap();
+    h.build([{ id: 10, score: 3 }, { id: 2, score: 3 }]);
+    expect(h.peek()?.id).toBe(2);
+  });
+});
+
+describe('MaxHeap randomized test against a sorted reference', () => {
+  it('matches the reference after every operation (seeded)', () => {
+    const rand = seededRandom(20261119);
     const heap = new MaxHeap();
-    const map = new Map<string, number>(); // Sorted reference map
-    
-    // Fuzz test: 2000 random operations
-    for (let i = 0; i < 2000; i++) {
-      const op = Math.random();
-      const id = `B_${Math.floor(Math.random() * 50)}`; // Pool of 50 barangays
-      
-      if (op < 0.6) {
-        // 60% chance: Insert / Update
-        const score = Math.floor(Math.random() * 100);
+    const model = new Map<string, number>();
+
+    for (let step = 0; step < 5000; step++) {
+      const id = `b${Math.floor(rand() * 60)}`;
+      const score = Math.floor(rand() * 20); // small range forces many ties
+      const op = rand();
+
+      if (op < 0.55) {
         heap.updateKey(id, score);
-        map.set(id, score);
-      } else if (op < 0.8 && heap.size() > 0) {
-        // 20% chance: Extract Max
-        const max = heap.extractMax();
-        if (max) map.delete(max.barangayId);
+        model.set(id, score);
+      } else if (op < 0.75) {
+        expect(heap.remove(id)).toBe(model.delete(id));
+      } else if (op < 0.9) {
+        const expected = sortedReference(model)[0];
+        expect(heap.extractMax()).toEqual(expected);
+        if (expected) model.delete(expected.id);
       } else {
-        // 20% chance: Remove specific key
-        heap.remove(id);
-        map.delete(id);
+        const entries = sortedReference(model);
+        const shuffled = [...entries].sort(() => rand() - 0.5);
+        heap.build(shuffled);
       }
-      verifyHeapInvariants(heap);
+
+      const ref = sortedReference(model);
+      const k = Math.floor(rand() * 10);
+      expect(heap.isValid()).toBe(true);
+      expect(heap.size).toBe(ref.length);
+      expect(heap.peek()).toEqual(ref[0]);
+      expect(heap.topK(k)).toEqual(ref.slice(0, k));
     }
-    
-    expect(heap.size()).toBe(map.size);
   });
 });

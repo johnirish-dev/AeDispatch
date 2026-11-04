@@ -1,194 +1,198 @@
-export interface HeapItem {
-  barangayId: string;
+// Indexed binary max heap for the barangay priority queue.
+//
+// The heap array holds (id, score) entries. A position map (id -> array index)
+// lets us find any barangay in O(1), so a score can change without a search.
+//
+// Complexity (n = number of entries):
+//   build O(n) | updateKey O(log n) | remove O(log n) | extractMax O(log n)
+//   peek O(1)  | topK O(k log k)    | has O(1)        | size O(1)
+//
+// Ids must all be the same type (all strings or all numbers) so that the
+// tie-break comparison is well defined.
+
+export type HeapId = string | number;
+
+export interface HeapEntry {
+  id: HeapId;
   score: number;
 }
 
 export class MaxHeap {
-  private heap: HeapItem[] = [];
-  private pos: Map<string, number> = new Map();
+  private heap: HeapEntry[] = [];
+  private pos = new Map<HeapId, number>();
 
-  // O(1)
-  public size(): number {
+  get size(): number {
     return this.heap.length;
   }
 
-  // O(1)
-  public has(barangayId: string): boolean {
-    return this.pos.has(barangayId);
+  has(id: HeapId): boolean {
+    return this.pos.has(id);
   }
 
-  // O(n) - Bottom-up heap construction
-  public build(items: HeapItem[]): void {
-    this.heap = items.map(item => ({ ...item }));
-    this.pos.clear();
-    for (let i = 0; i < this.heap.length; i++) {
-      this.pos.set(this.heap[i].barangayId, i);
+  /** Replace the contents with `entries`. Ids must be unique. */
+  build(entries: HeapEntry[]): void {
+    const seen = new Set<HeapId>();
+    for (const e of entries) {
+      if (seen.has(e.id)) throw new Error(`Duplicate id in build: ${e.id}`);
+      seen.add(e.id);
     }
+
+    this.heap = entries.map((e) => ({ id: e.id, score: e.score }));
+    this.pos = new Map();
+    this.heap.forEach((e, i) => this.pos.set(e.id, i));
+
+    // Sift down every parent, starting from the last one.
     for (let i = Math.floor(this.heap.length / 2) - 1; i >= 0; i--) {
       this.siftDown(i);
     }
   }
 
-  // O(log n) - Insert if absent, update and sift if present
-  public updateKey(barangayId: string, score: number): void {
-    if (this.pos.has(barangayId)) {
-      const idx = this.pos.get(barangayId)!;
-      const oldScore = this.heap[idx].score;
-      this.heap[idx].score = score;
-      
-      // Since score could go up or down, we check which way to sift
-      if (idx > 0 && this.compare(idx, this.parent(idx)) > 0) {
-        this.siftUp(idx);
-      } else {
-        this.siftDown(idx);
-      }
-    } else {
-      this.heap.push({ barangayId, score });
-      const idx = this.heap.length - 1;
-      this.pos.set(barangayId, idx);
-      this.siftUp(idx);
+  /** Set the score of `id`, inserting it if it is not in the heap yet. */
+  updateKey(id: HeapId, score: number): void {
+    const i = this.pos.get(id);
+    if (i === undefined) {
+      this.heap.push({ id, score });
+      this.pos.set(id, this.heap.length - 1);
+      this.siftUp(this.heap.length - 1);
+      return;
     }
+    this.heap[i].score = score;
+    this.restore(i);
   }
 
-  // O(1)
-  public peek(): HeapItem | null {
-    return this.heap.length > 0 ? { ...this.heap[0] } : null;
+  /** The highest-ranked entry, or undefined if the heap is empty. */
+  peek(): HeapEntry | undefined {
+    return this.heap.length > 0 ? { ...this.heap[0] } : undefined;
   }
 
-  // O(log n)
-  public extractMax(): HeapItem | null {
-    if (this.heap.length === 0) return null;
-    const max = this.heap[0];
-    this.swap(0, this.heap.length - 1);
+  /** Remove and return the highest-ranked entry. */
+  extractMax(): HeapEntry | undefined {
+    const top = this.peek();
+    if (top) this.remove(top.id);
+    return top;
+  }
+
+  /** Remove `id`. Returns false if it was not in the heap. */
+  remove(id: HeapId): boolean {
+    const i = this.pos.get(id);
+    if (i === undefined) return false;
+
+    const last = this.heap.length - 1;
+    this.swap(i, last);
     this.heap.pop();
-    this.pos.delete(max.barangayId);
-    
-    if (this.heap.length > 0) {
-      this.siftDown(0);
-    }
-    return max;
+    this.pos.delete(id);
+
+    // The entry moved into slot i may belong higher or lower.
+    if (i < this.heap.length) this.restore(i);
+    return true;
   }
 
-  // O(log n) - Swap target with leaf, pop, and sift swapped element
-  public remove(barangayId: string): void {
-    if (!this.pos.has(barangayId)) return;
-    
-    const idx = this.pos.get(barangayId)!;
-    const isLast = idx === this.heap.length - 1;
-    
-    this.swap(idx, this.heap.length - 1);
-    this.heap.pop();
-    this.pos.delete(barangayId);
-    
-    if (!isLast && this.heap.length > 0) {
-      if (idx > 0 && this.compare(idx, this.parent(idx)) > 0) {
-        this.siftUp(idx);
-      } else {
-        this.siftDown(idx);
+  /**
+   * The k highest-ranked entries in rank order, without changing the heap.
+   * An auxiliary heap holds candidate indices: the next best entry is always
+   * the best candidate, and extracting it adds its two children.
+   */
+  topK(k: number): HeapEntry[] {
+    const count = Math.min(Math.floor(k), this.heap.length);
+    if (!(count > 0)) return [];
+
+    const candidates: number[] = [0];
+    const better = (a: number, b: number) =>
+      MaxHeap.outranks(this.heap[a], this.heap[b]);
+
+    const pushCandidate = (index: number) => {
+      candidates.push(index);
+      let c = candidates.length - 1;
+      while (c > 0) {
+        const parent = (c - 1) >> 1;
+        if (!better(candidates[c], candidates[parent])) break;
+        [candidates[c], candidates[parent]] = [candidates[parent], candidates[c]];
+        c = parent;
       }
+    };
+
+    const popCandidate = (): number => {
+      const best = candidates[0];
+      const tail = candidates.pop() as number;
+      if (candidates.length > 0) {
+        candidates[0] = tail;
+        let c = 0;
+        for (;;) {
+          const left = 2 * c + 1;
+          const right = left + 1;
+          let top = c;
+          if (left < candidates.length && better(candidates[left], candidates[top])) top = left;
+          if (right < candidates.length && better(candidates[right], candidates[top])) top = right;
+          if (top === c) break;
+          [candidates[c], candidates[top]] = [candidates[top], candidates[c]];
+          c = top;
+        }
+      }
+      return best;
+    };
+
+    const result: HeapEntry[] = [];
+    while (result.length < count) {
+      const index = popCandidate();
+      result.push({ ...this.heap[index] });
+      const left = 2 * index + 1;
+      if (left < this.heap.length) pushCandidate(left);
+      if (left + 1 < this.heap.length) pushCandidate(left + 1);
     }
-  }
-
-  // O(k log k) - Uses an auxiliary candidate heap to extract top K without modifying the live heap
-  public topK(k: number): HeapItem[] {
-    if (this.heap.length === 0 || k <= 0) return [];
-    
-    const result: HeapItem[] = [];
-    const auxHeap: number[] = []; // Stores indices of the main heap
-    
-    const auxCompare = (i: number, j: number) => this.compare(auxHeap[i], auxHeap[j]);
-    const auxSwap = (i: number, j: number) => {
-      const temp = auxHeap[i]; auxHeap[i] = auxHeap[j]; auxHeap[j] = temp;
-    };
-    
-    const auxSiftUp = (idx: number) => {
-      while (idx > 0) {
-        const p = Math.floor((idx - 1) / 2);
-        if (auxCompare(idx, p) > 0) { auxSwap(idx, p); idx = p; } else break;
-      }
-    };
-    
-    const auxSiftDown = (idx: number) => {
-      const size = auxHeap.length;
-      while (true) {
-        let maxIdx = idx;
-        const left = 2 * idx + 1, right = 2 * idx + 2;
-        if (left < size && auxCompare(left, maxIdx) > 0) maxIdx = left;
-        if (right < size && auxCompare(right, maxIdx) > 0) maxIdx = right;
-        if (maxIdx !== idx) { auxSwap(idx, maxIdx); idx = maxIdx; } else break;
-      }
-    };
-
-    auxHeap.push(0); // push root index
-
-    while (result.length < k && auxHeap.length > 0) {
-      const topIdx = auxHeap[0];
-      auxSwap(0, auxHeap.length - 1);
-      auxHeap.pop();
-      if (auxHeap.length > 0) auxSiftDown(0);
-      
-      result.push({ ...this.heap[topIdx] });
-
-      const left = this.left(topIdx);
-      const right = this.right(topIdx);
-      
-      if (left < this.heap.length) { auxHeap.push(left); auxSiftUp(auxHeap.length - 1); }
-      if (right < this.heap.length) { auxHeap.push(right); auxSiftUp(auxHeap.length - 1); }
-    }
-
     return result;
   }
 
-  // --- Internal Heap Mechanics ---
-
-  private parent(i: number) { return Math.floor((i - 1) / 2); }
-  private left(i: number) { return 2 * i + 1; }
-  private right(i: number) { return 2 * i + 2; }
-
-  // Returns > 0 if heap[i] > heap[j]
-  private compare(i: number, j: number): number {
-    if (this.heap[i].score !== this.heap[j].score) {
-      return this.heap[i].score - this.heap[j].score;
+  /** True if the heap order and the position map are both consistent. */
+  isValid(): boolean {
+    if (this.pos.size !== this.heap.length) return false;
+    for (let i = 0; i < this.heap.length; i++) {
+      if (this.pos.get(this.heap[i].id) !== i) return false;
+      if (i > 0 && MaxHeap.outranks(this.heap[i], this.heap[(i - 1) >> 1])) return false;
     }
-    // Tie-breaker: deterministic descending alphabetical sort for stable ranking
-    return this.heap[j].barangayId.localeCompare(this.heap[i].barangayId);
+    return true;
+  }
+
+  // a ranks above b if its score is higher; equal scores go to the smaller id.
+  // Plain < is used (not localeCompare) so the order never depends on locale.
+  private static outranks(a: HeapEntry, b: HeapEntry): boolean {
+    if (a.score !== b.score) return a.score > b.score;
+    return a.id < b.id;
+  }
+
+  // Move the entry at i up or down, whichever direction it needs.
+  private restore(i: number): void {
+    const id = this.heap[i].id; // siftUp may move it, so follow it by id
+    this.siftUp(i);
+    this.siftDown(this.pos.get(id) as number);
+  }
+
+  private siftUp(i: number): void {
+    while (i > 0) {
+      const parent = (i - 1) >> 1;
+      if (!MaxHeap.outranks(this.heap[i], this.heap[parent])) break;
+      this.swap(i, parent);
+      i = parent;
+    }
+  }
+
+  private siftDown(i: number): void {
+    const n = this.heap.length;
+    for (;;) {
+      const left = 2 * i + 1;
+      const right = left + 1;
+      let top = i;
+      if (left < n && MaxHeap.outranks(this.heap[left], this.heap[top])) top = left;
+      if (right < n && MaxHeap.outranks(this.heap[right], this.heap[top])) top = right;
+      if (top === i) return;
+      this.swap(i, top);
+      i = top;
+    }
   }
 
   private swap(i: number, j: number): void {
-    const temp = this.heap[i];
-    this.heap[i] = this.heap[j];
-    this.heap[j] = temp;
-    this.pos.set(this.heap[i].barangayId, i);
-    this.pos.set(this.heap[j].barangayId, j);
+    if (i === j) return;
+    [this.heap[i], this.heap[j]] = [this.heap[j], this.heap[i]];
+    this.pos.set(this.heap[i].id, i);
+    this.pos.set(this.heap[j].id, j);
   }
-
-  private siftUp(idx: number): void {
-    while (idx > 0 && this.compare(idx, this.parent(idx)) > 0) {
-      this.swap(idx, this.parent(idx));
-      idx = this.parent(idx);
-    }
-  }
-
-  private siftDown(idx: number): void {
-    const size = this.heap.length;
-    while (true) {
-      let maxIdx = idx;
-      const l = this.left(idx);
-      const r = this.right(idx);
-      
-      if (l < size && this.compare(l, maxIdx) > 0) maxIdx = l;
-      if (r < size && this.compare(r, maxIdx) > 0) maxIdx = r;
-      
-      if (maxIdx !== idx) {
-        this.swap(idx, maxIdx);
-        idx = maxIdx;
-      } else {
-        break;
-      }
-    }
-  }
-
-  // Visibility purely for strict Vitest invariant checks
-  public _test_getHeapArray() { return this.heap; }
-  public _test_getPosMap() { return this.pos; }
 }
