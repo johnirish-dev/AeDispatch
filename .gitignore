@@ -6,3 +6,4 @@ coverage/
 *.sqlite
 *.sqlite-journal
 reports/
+.DS_Store 
