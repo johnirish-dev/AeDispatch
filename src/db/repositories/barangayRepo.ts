@@ -118,3 +118,45 @@ export function densityRatios(db: Db): Map<number, number> {
   const max = Math.max(0, ...all.map((b) => b.densityPerKm2));
   return new Map(all.map((b) => [b.id, max > 0 ? b.densityPerKm2 / max : 0]));
 }
+
+export function getPurok(db: Db, id: number): PurokRow | undefined {
+  const r = db.prepare("SELECT id, barangay_id, name FROM purok WHERE id = ?").get(id) as
+    | { id: number; barangay_id: number; name: string }
+    | undefined;
+  return r ? { id: r.id, barangayId: r.barangay_id, name: r.name } : undefined;
+}
+
+/**
+ * Makes the barangay's purok list equal `names`: missing names are added and
+ * names that are no longer listed are deleted, together with that purok's case
+ * records (cascade). Matching ignores case and extra spaces.
+ */
+export function setPuroks(
+  db: Db,
+  barangayId: number,
+  names: string[],
+  at: string = now(),
+): { added: string[]; removed: string[] } {
+  const key = (s: string) => s.trim().replace(/s+/g, " ").toLowerCase();
+  const wanted = new Map(names.map((n) => [key(n), n.trim().replace(/s+/g, " ")]));
+  const current = puroksOf(db, barangayId);
+  const have = new Set(current.map((p) => key(p.name)));
+
+  const added: string[] = [];
+  const removed: string[] = [];
+  db.transaction(() => {
+    for (const p of current) {
+      if (!wanted.has(key(p.name))) {
+        db.prepare("DELETE FROM purok WHERE id = ?").run(p.id);
+        removed.push(p.name);
+      }
+    }
+    for (const [k, name] of wanted) {
+      if (!have.has(k)) {
+        db.prepare("INSERT INTO purok (barangay_id, name, created_at) VALUES (?, ?, ?)").run(barangayId, name, at);
+        added.push(name);
+      }
+    }
+  })();
+  return { added, removed };
+}

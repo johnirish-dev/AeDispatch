@@ -104,3 +104,60 @@ export function surveyTotals(db: Db, barangayId: number, from: string, to: strin
     )
     .get(barangayId, from, to) as { surveys: number; containers: number; positive: number };
 }
+
+// ---- resident and symptom writes -------------------------------------------
+
+/** One answer per resident per day. Returns false if they already answered today. */
+export function insertDailyAnswer(
+  db: Db,
+  a: { residentId: number; barangayId: number; date: string; answer: "yes" | "no"; at?: string },
+): boolean {
+  const at = a.at ?? new Date().toISOString();
+  return (
+    db
+      .prepare(
+        `INSERT OR IGNORE INTO daily_answer (resident_id, barangay_id, date, answer, created_at)
+         VALUES (?, ?, ?, ?, ?)`,
+      )
+      .run(a.residentId, a.barangayId, a.date, a.answer, at).changes > 0
+  );
+}
+
+export function insertHouseholdReport(
+  db: Db,
+  r: {
+    residentId: number;
+    barangayId: number;
+    date: string;
+    standingWater: boolean;
+    cloggedGutter: boolean;
+    oldContainers: boolean;
+    bitesIndoors: boolean;
+    at?: string;
+  },
+): number {
+  const at = r.at ?? new Date().toISOString();
+  const info = db
+    .prepare(
+      `INSERT INTO household_report
+        (resident_id, barangay_id, date, standing_water, clogged_gutter, old_containers, bites_indoors, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .run(r.residentId, r.barangayId, r.date, +r.standingWater, +r.cloggedGutter, +r.oldContainers, +r.bitesIndoors, at);
+  return Number(info.lastInsertRowid);
+}
+
+/** Adds one anonymous symptom check to the barangay's daily total. No resident is stored. */
+export function addSymptomCheck(
+  db: Db,
+  c: { barangayId: number; date: string; warningSigns: boolean; at?: string },
+): void {
+  const at = c.at ?? new Date().toISOString();
+  db.prepare(
+    `INSERT INTO symptom_count (barangay_id, date, checks, checks_with_warning_signs, created_at)
+     VALUES (@barangayId, @date, 1, @warning, @at)
+     ON CONFLICT (barangay_id, date) DO UPDATE SET
+       checks = checks + 1,
+       checks_with_warning_signs = checks_with_warning_signs + @warning`,
+  ).run({ barangayId: c.barangayId, date: c.date, warning: c.warningSigns ? 1 : 0, at });
+}

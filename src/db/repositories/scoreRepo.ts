@@ -107,3 +107,13 @@ export function scoreHistory(db: Db, barangayId: number, limit = 30): ScoreRow[]
     .all(barangayId, limit) as RawScore[];
   return rows.map(toRow);
 }
+
+/** The newest score computed at or before `atIso`. Used for the 7-day trend. */
+export function scoreAtOrBefore(db: Db, barangayId: number, atIso: string): ScoreRow | undefined {
+  const r = db
+    .prepare(
+      "SELECT * FROM threat_score WHERE barangay_id = ? AND computed_at <= ? ORDER BY computed_at DESC, id DESC LIMIT 1",
+    )
+    .get(barangayId, atIso) as RawScore | undefined;
+  return r ? toRow(r) : undefined;
+}

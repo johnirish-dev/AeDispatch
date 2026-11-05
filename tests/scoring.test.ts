@@ -177,10 +177,13 @@ describe("householdIndex", () => {
 
 describe("symptomIndex", () => {
   it("scales warning-sign checks per 1,000 residents by s_max", () => {
-    // 2 of 4,000 residents = 0.5 per 1,000; s_max = 1
+    // 2 of 4,000 residents = 0.5 per 1,000; s_max = 4 -> 0.125
     const r = symptomIndex({ warningChecks: 2, totalChecks: 9, population: 4000 }, P);
     expect(r.warningChecksPer1000).toBeCloseTo(0.5, 10);
-    expect(r.index).toBeCloseTo(0.5, 10);
+    expect(r.index).toBeCloseTo(0.125, 10);
+  });
+  it("reaches 1 at the s_max rate (4 per 1,000)", () => {
+    expect(symptomIndex({ warningChecks: 16, totalChecks: 40, population: 4000 }, P).index).toBeCloseTo(1, 10);
   });
   it("is 0 with no warning checks", () => {
     expect(symptomIndex({ warningChecks: 0, totalChecks: 30, population: 4000 }, P).index).toBe(0);
@@ -329,6 +332,14 @@ describe("validateParameters", () => {
       validateParameters({ ...P, weights: { ...P.weights, cases: 0.5 } }),
     ).toThrow(/add up to 1/);
   });
+  it("rejects a missing or zero data window", () => {
+    expect(() =>
+      validateParameters({
+        ...P,
+        constants: { ...P.constants, windows: { ...P.constants.windows, fieldDays: 0 } },
+      }),
+    ).toThrow(/windows.fieldDays/);
+  });
   it("rejects a zero divisor", () => {
     expect(() =>
       validateParameters({ ...P, constants: { ...P.constants, rainMaxMm: 0 } }),
@@ -344,20 +355,21 @@ describe("validateParameters", () => {
 //             160 mm / 14 days -> f_R = 1 (capped)
 //             W = 0.5 * 0.85455 + 0.5 * 1                   = 0.92727
 //   Household C = 0.5 * 0.6 + 0.5 * 0.6                     = 0.60000
-//   Symptom   2 / 4,120 residents = 0.4854 per 1,000        = 0.48544
+//   Symptom   2 / 4,120 residents = 0.4854 per 1,000; / s_max 4 = 0.12136
 //   Field     (6 + 10 * 0.1) / (60 + 10)                    = 0.10000
 //   Cases     r = 3 / 4,120 * 10,000 = 7.2816, g = 2/2 = 1
 //             H = 0.5 * 7.2816 / 8 + 0.5 * 1                = 0.95510
 //
 //   Points    0.92727*20 = 18.545     0.6*15 = 9.000
-//             0.48544*10 =  4.854     0.1*25 = 2.500
+//             0.12136*10 =  1.214     0.1*25 = 2.500
 //             0.95510*30 = 28.653
-//   Subtotal  63.553
+//   Subtotal  59.912
 //   Density   rho = 0.95 -> (1 + 0.5 * 0.95) / 1.5 = 0.98333
-//   Score     63.553 * 0.98333 = 62.49  -> shown as 62 (Elevated)
+//   Score     59.912 * 0.98333 = 58.91  -> shown as 59 (Elevated)
 //
-// (With the earlier 25/20/10/15/30 weights the same data gave about 70; the
-// weights were changed, so the expected value changed with them.)
+// (With the earlier 25/20/10/15/30 weights and s_max = 1 the same data gave
+// about 70 and then 62; the weights and s_max were changed, so the expected
+// value changed with them.)
 // ---------------------------------------------------------------------------
 describe("worked example: Penafrancia", () => {
   const penafrancia: BarangayInputs = {
@@ -386,20 +398,20 @@ describe("worked example: Penafrancia", () => {
     expect(r.details.weather.index).toBeCloseTo(0.92727, 4);
     expect(r.details.household.index).toBeCloseTo(0.6, 6);
     expect(r.details.household.confidence).toBe("good");
-    expect(r.details.symptom.index).toBeCloseTo(0.48544, 4);
+    expect(r.details.symptom.index).toBeCloseTo(0.12136, 4);
     expect(r.details.field.index).toBeCloseTo(0.1, 6);
     expect(r.details.cases.index).toBeCloseTo(0.9551, 4);
 
     expect(r.factors.weather.points).toBeCloseTo(18.545, 2);
     expect(r.factors.household.points).toBeCloseTo(9.0, 2);
-    expect(r.factors.symptom.points).toBeCloseTo(4.854, 2);
+    expect(r.factors.symptom.points).toBeCloseTo(1.214, 2);
     expect(r.factors.field.points).toBeCloseTo(2.5, 2);
     expect(r.factors.cases.points).toBeCloseTo(28.653, 2);
 
-    expect(r.subtotal).toBeCloseTo(63.553, 2);
+    expect(r.subtotal).toBeCloseTo(59.912, 2);
     expect(r.densityFactor).toBeCloseTo(0.98333, 4);
-    expect(r.score).toBeCloseTo(0.6249, 3);
-    expect(r.score100).toBe(62);
+    expect(r.score).toBeCloseTo(0.5891, 3);
+    expect(r.score100).toBe(59);
     expect(r.paramsVersion).toBe(1);
   });
 
@@ -412,9 +424,9 @@ describe("worked example: Penafrancia", () => {
     expect(noSurvey.details.field.index).toBeCloseTo(0.15, 10); // global prior
     expect(noSurvey.factors.field.weight).toBe(0.25);
     expect(noSurvey.factors.weather.weight).toBe(0.2);
-    // Field points: 0.15 * 25 = 3.75 instead of 2.5 -> subtotal 64.803
-    expect(noSurvey.subtotal).toBeCloseTo(64.803, 2);
-    expect(noSurvey.score100).toBe(64);
+    // Field points: 0.15 * 25 = 3.75 instead of 2.5 -> subtotal 61.162
+    expect(noSurvey.subtotal).toBeCloseTo(61.162, 2);
+    expect(noSurvey.score100).toBe(60);
   });
 
   it("scores a surveyed and an unsurveyed barangay on the same weights", () => {

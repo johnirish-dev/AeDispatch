@@ -26,7 +26,7 @@ describe("seed", () => {
     const db = seededDb();
     expect(count(db, "barangay")).toBe(8);
     expect(count(db, "purok")).toBe(SAMPLE_BARANGAYS.reduce((n, b) => n + b.puroks, 0));
-    expect(count(db, "bhw")).toBe(4);
+    expect(count(db, "bhw")).toBe(8);
     expect(count(db, "case_record")).toBe(8 * count(db, "purok")); // 8 weeks, every purok
     expect(count(db, "case_import")).toBe(8);
     expect(count(db, "symptom_count")).toBe(8 * 53); // 53 days from 2026-09-14 to 2026-11-05
@@ -51,7 +51,7 @@ describe("seed", () => {
   it("gives each BHW a working token link, stored only as a hash", () => {
     const db = emptyDb();
     const summary = seedDatabase(db, { anchorDate: SEED_DATE });
-    expect(summary.bhwTokens).toHaveLength(4);
+    expect(summary.bhwTokens).toHaveLength(8);
     for (const t of summary.bhwTokens) {
       expect(findBhwByTokenHash(db, hashToken(t.token))!.displayName).toBe(t.name);
       const stored = JSON.stringify(db.prepare("SELECT access_token_hash FROM bhw").all());

@@ -92,3 +92,23 @@ export function purokCases(
     )
     .all(...isoWeeks, barangayId) as { purokId: number; purokName: string; cases: number }[];
 }
+
+/**
+ * The newest case week that has started by `asOf` (YYYY-MM-DD), or null when
+ * there is no case data yet. A file for a week in the future is stored but
+ * does not count until that week begins.
+ */
+export function latestCaseWeek(db: Db, asOf: string): string | null {
+  const r = db
+    .prepare("SELECT iso_week AS w FROM case_record WHERE week_start <= ? ORDER BY week_start DESC LIMIT 1")
+    .get(asOf) as { w: string } | undefined;
+  return r ? r.w : null;
+}
+
+/** Confirmed cases in one week across all barangays. */
+export function weekCaseTotal(db: Db, isoWeek: string): number {
+  const r = db
+    .prepare("SELECT COALESCE(SUM(confirmed_cases), 0) AS n FROM case_record WHERE iso_week = ?")
+    .get(isoWeek) as { n: number };
+  return r.n;
+}

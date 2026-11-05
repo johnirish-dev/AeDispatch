@@ -7,6 +7,7 @@ import fs from "node:fs";
 import { todayUtc, isValidDate } from "../util/dates";
 import { defaultDbPath, openDatabase } from "./connection";
 import { runMigrations } from "./migrate";
+import { RankingService } from "../services/ranking";
 import { OFFICER_PASSWORD, OFFICER_USERNAME, seedDatabase } from "./seedDatabase";
 
 function main(): void {
@@ -19,6 +20,11 @@ function main(): void {
   const db = openDatabase(file);
   runMigrations(db);
   const summary = seedDatabase(db, { anchorDate: anchor, phoneSalt: process.env.PHONE_HASH_SALT || undefined });
+
+  // The seed stores only a few stub scores, so work out a real score for every
+  // barangay and every day of the sample history (trend arrows and charts need it).
+  new RankingService(db, { clock: () => new Date(`${anchor}T12:00:00.000Z`) }).backfillHistory(summary.startDate, anchor);
+  summary.counts.threat_score = (db.prepare("SELECT COUNT(*) AS n FROM threat_score").get() as { n: number }).n;
   db.close();
 
   console.log(`Seeded ${file}`);

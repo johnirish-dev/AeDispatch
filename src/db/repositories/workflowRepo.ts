@@ -244,3 +244,141 @@ export function listEvents(db: Db, limit = 50) {
     .prepare("SELECT id, at, type, text FROM event_log ORDER BY at DESC, id DESC LIMIT ?")
     .all(limit) as { id: number; at: string; type: EventType; text: string }[];
 }
+
+/** When this barangay's alerts were issued since `sinceIso` (for the alert cap). */
+export function alertTimesSince(db: Db, barangayId: number, sinceIso: string): Date[] {
+  const rows = db
+    .prepare("SELECT issued_at AS t FROM alert WHERE barangay_id = ? AND issued_at >= ? ORDER BY issued_at")
+    .all(barangayId, sinceIso) as { t: string }[];
+  return rows.map((r) => new Date(r.t));
+}
+
+export function getTask(db: Db, id: number) {
+  const r = db
+    .prepare("SELECT id, barangay_id, bhw_id, type, status FROM field_task WHERE id = ?")
+    .get(id) as { id: number; barangay_id: number; bhw_id: number; type: TaskType; status: TaskStatus } | undefined;
+  return r ? { id: r.id, barangayId: r.barangay_id, bhwId: r.bhw_id, type: r.type, status: r.status } : undefined;
+}
+
+/** True if the barangay already has a task of this type that is not finished. */
+export function hasOpenTask(db: Db, barangayId: number, type: TaskType): boolean {
+  const r = db
+    .prepare("SELECT COUNT(*) AS n FROM field_task WHERE barangay_id = ? AND type = ? AND status IN ('new','in_progress')")
+    .get(barangayId, type) as { n: number };
+  return r.n > 0;
+}
+
+export function countActiveTasks(db: Db): number {
+  const r = db.prepare("SELECT COUNT(*) AS n FROM field_task WHERE status IN ('new','in_progress')").get() as { n: number };
+  return r.n;
+}
+
+/** Every field assignment, open ones first. `households` counts the surveys filed against it. */
+export function listTasks(db: Db) {
+  const rows = db
+    .prepare(
+      `SELECT t.id, t.barangay_id AS barangayId, b.name AS barangayName, t.bhw_id AS bhwId,
+              h.display_name AS bhwName, h.team_label AS teamLabel, t.type, t.status, t.puroks,
+              t.recommendation_id AS recommendationId, t.created_at AS createdAt, t.updated_at AS updatedAt,
+              (SELECT COUNT(*) FROM entomological_survey s WHERE s.task_id = t.id) AS households
+       FROM field_task t
+       JOIN barangay b ON b.id = t.barangay_id
+       JOIN bhw h ON h.id = t.bhw_id
+       ORDER BY CASE t.status WHEN 'new' THEN 0 WHEN 'in_progress' THEN 1 ELSE 2 END, t.id DESC`,
+    )
+    .all() as {
+    id: number;
+    barangayId: number;
+    barangayName: string;
+    bhwId: number;
+    bhwName: string;
+    teamLabel: string | null;
+    type: TaskType;
+    status: TaskStatus;
+    puroks: string;
+    recommendationId: number | null;
+    createdAt: string;
+    updatedAt: string;
+    households: number;
+  }[];
+  return rows.map((r) => ({ ...r, puroks: JSON.parse(r.puroks) as string[] }));
+}
+
+export interface FindingFilters {
+  barangayId?: number;
+  bhwId?: number;
+  /** Survey date range, inclusive (YYYY-MM-DD). */
+  from?: string;
+  to?: string;
+  limit?: number;
+}
+
+/** Submitted surveys, newest first. Household details are NOT in this list. */
+export function listFindings(db: Db, f: FindingFilters = {}) {
+  return db
+    .prepare(
+      `SELECT s.id, s.barangay_id AS barangayId, b.name AS barangayName, s.purok_id AS purokId,
+              p.name AS purokName, s.house_no AS houseNo, s.survey_date AS surveyDate,
+              s.bhw_id AS bhwId, COALESCE(h.display_name, s.surveyed_by) AS bhwName, s.submitted_at AS submittedAt,
+              COALESCE(SUM(c.total), 0) AS containers, COALESCE(SUM(c.positive), 0) AS positive
+       FROM entomological_survey s
+       JOIN barangay b ON b.id = s.barangay_id
+       LEFT JOIN purok p ON p.id = s.purok_id
+       LEFT JOIN bhw h ON h.id = s.bhw_id
+       LEFT JOIN survey_container c ON c.survey_id = s.id
+       WHERE (@barangayId IS NULL OR s.barangay_id = @barangayId)
+         AND (@bhwId IS NULL OR s.bhw_id = @bhwId)
+         AND (@from IS NULL OR s.survey_date >= @from)
+         AND (@to IS NULL OR s.survey_date <= @to)
+       GROUP BY s.id
+       ORDER BY s.survey_date DESC, s.id DESC
+       LIMIT @limit`,
+    )
+    .all({
+      barangayId: f.barangayId ?? null,
+      bhwId: f.bhwId ?? null,
+      from: f.from ?? null,
+      to: f.to ?? null,
+      limit: f.limit ?? 200,
+    }) as {
+    id: number;
+    barangayId: number;
+    barangayName: string;
+    purokId: number | null;
+    purokName: string | null;
+    houseNo: string | null;
+    surveyDate: string;
+    bhwId: number | null;
+    bhwName: string | null;
+    submittedAt: string;
+    containers: number;
+    positive: number;
+  }[];
+}
+
+/** One whole survey with its containers, as on the paper form. Officers and BHWs only. */
+export function getFinding(db: Db, id: number) {
+  const s = db
+    .prepare(
+      `SELECT s.id, s.task_id AS taskId, s.bhw_id AS bhwId, s.barangay_id AS barangayId, b.name AS barangayName,
+              s.purok_id AS purokId, p.name AS purokName, s.house_no AS houseNo, s.head_of_family AS headOfFamily,
+              s.age, s.sex, s.civil_status AS civilStatus, s.occupation, s.persons_slept AS personsSlept,
+              s.building_structure AS buildingStructure, s.storeys, s.rooms, s.screened,
+              s.surveyed_by AS surveyedBy, s.survey_date AS surveyDate, s.no_containers_found AS noContainersFound,
+              s.submitted_at AS submittedAt
+       FROM entomological_survey s
+       JOIN barangay b ON b.id = s.barangay_id
+       LEFT JOIN purok p ON p.id = s.purok_id
+       WHERE s.id = ?`,
+    )
+    .get(id) as Record<string, unknown> | undefined;
+  if (!s) return undefined;
+  const containers = db
+    .prepare(
+      `SELECT location, container_type AS containerType, total, with_cover AS withCover, without_cover AS withoutCover,
+              positive, larvae_count AS larvaeCount, pupae_count AS pupaeCount
+       FROM survey_container WHERE survey_id = ? ORDER BY id`,
+    )
+    .all(id);
+  return { ...s, screened: s.screened === null ? null : Boolean(s.screened), noContainersFound: Boolean(s.noContainersFound), containers };
+}

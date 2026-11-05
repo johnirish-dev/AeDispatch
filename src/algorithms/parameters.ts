@@ -32,6 +32,9 @@ export interface Constants {
   /** How the weather index mixes its two parts. Adds up to 1. */
   weatherBlend: { temperature: number; rainfall: number };
 
+  // --- Data windows (days of data each index looks at) ---
+  windows: { householdDays: number; symptomDays: number; fieldDays: number };
+
   // --- Household index ---
   /** Pseudo-observations that keep small samples near the prior. */
   smoothing: { answers: number; reports: number; field: number };
@@ -111,14 +114,17 @@ export const DEFAULT_PARAMETERS: ModelParameters = {
     rainMaxMm: 150,
     weatherBlend: { temperature: 0.5, rainfall: 0.5 },
 
+    windows: { householdDays: 7, symptomDays: 7, fieldDays: 14 },
+
     smoothing: { answers: 10, reports: 10, field: 10 },
     priors: { answers: 0.2, reports: 0.3, field: 0.15 },
     householdBlend: { answers: 0.5, reports: 0.5 },
     confidenceCutoffs: { partial: 5, good: 30 },
 
-    // Chosen so that about 2 warning-sign checks in 4,000 residents already
-    // reads as a clear signal (matches the wireframe example).
-    symptomMaxPer1000: 1,
+    // About 4 warning-sign checks per 1,000 residents in a week is a full
+    // signal. The sample outbreak barangays reach 2-4 per 1,000 while quiet
+    // ones stay near 0-1, so the index separates them instead of saturating.
+    symptomMaxPer1000: 4,
 
     caseRateMaxPer10k: 8,
     caseGrowthMax: 1,
@@ -160,7 +166,7 @@ export function validateParameters(p: ModelParameters): void {
   }
 
   const c = p.constants;
-  const mustBePositive: [string, number][] = [
+  const mustBePositive: [string, number | undefined][] = [
     ["rainMaxMm", c.rainMaxMm],
     ["symptomMaxPer1000", c.symptomMaxPer1000],
     ["caseRateMaxPer10k", c.caseRateMaxPer10k],
@@ -169,9 +175,13 @@ export function validateParameters(p: ModelParameters): void {
     ["rainWindowDays", c.rainWindowDays],
     ["rainDaysWindowDays", c.rainDaysWindowDays],
     ["alertWindowDays", c.alertWindowDays],
+    // A database seeded before these existed has no windows: re-run `npm run seed`.
+    ["windows.householdDays", c.windows?.householdDays],
+    ["windows.symptomDays", c.windows?.symptomDays],
+    ["windows.fieldDays", c.windows?.fieldDays],
   ];
   for (const [name, value] of mustBePositive) {
-    if (!(value > 0)) throw new Error(`${name} must be greater than 0`);
+    if (!((value ?? 0) > 0)) throw new Error(`${name} must be greater than 0`);
   }
 
   const curve = c.tempCurve;

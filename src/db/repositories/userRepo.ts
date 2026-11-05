@@ -74,3 +74,11 @@ export function listBhws(db: Db): Bhw[] {
   }[];
   return rows.map(toBhw);
 }
+
+/** A resident is anonymous: only the barangay they chose is known. */
+export function getResident(db: Db, id: number): { id: number; barangayId: number } | undefined {
+  const r = db.prepare("SELECT id, barangay_id FROM resident WHERE id = ?").get(id) as
+    | { id: number; barangay_id: number }
+    | undefined;
+  return r ? { id: r.id, barangayId: r.barangay_id } : undefined;
+}

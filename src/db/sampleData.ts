@@ -31,4 +31,8 @@ export const SAMPLE_BHWS = [
   { displayName: "Maria L. Reyes", barangay: "Bascaran", team: "Team A" },
   { displayName: "Ramon D. Cruz", barangay: "Busay", team: "Team C" },
   { displayName: "Liza P. Ortega", barangay: "Sagpon", team: "Team A" },
+  { displayName: "Elena S. Garcia", barangay: "Tagas", team: "Team B" },
+  { displayName: "Rico T. Mendoza", barangay: "Mabini", team: "Team C" },
+  { displayName: "Nora B. Villanueva", barangay: "Kilicao", team: "Team D" },
+  { displayName: "Ben A. Torres", barangay: "Bañag", team: "Team D" },
 ];
