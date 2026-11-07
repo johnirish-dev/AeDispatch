@@ -332,7 +332,7 @@ export function seedDatabase(db: Db, opts: SeedOptions): SeedSummary {
           )
           .run(barangayId[b], scoreId, status, reason, officerId, at, at, at).lastInsertRowid,
       );
-      insEvent.run(at, "decision", `${status === "confirmed" ? "Confirmed" : "Rejected"} Tier 1 for ${name}`, at);
+      insEvent.run(at, "decision", status === "confirmed" ? `Confirmed Tier 1 for ${name}` : `Rejected Tier 1 for ${name}: "${reason}"`, at);
       const bhw = bhwOfBarangay.get(b);
       if (taskStatus && bhw) {
         db.prepare(

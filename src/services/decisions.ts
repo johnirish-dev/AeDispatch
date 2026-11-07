@@ -81,7 +81,8 @@ export class Decisions {
     return this.db.transaction(() => {
       const recommendationId = createRecommendation(this.db, { barangayId, scoreId, tier, at });
       decideRecommendation(this.db, { id: recommendationId, status: "rejected", officerId, reason, at });
-      addEvent(this.db, "decision", `Rejected ${TIER_NAME[tier]} for ${view.barangay.name}`, at);
+      // The reason goes into the timeline so colleagues can see why a barangay was left alone.
+      addEvent(this.db, "decision", `Rejected ${TIER_NAME[tier]} for ${view.barangay.name}: "${reason}"`, at);
       return { recommendationId };
     })();
   }

@@ -2,7 +2,7 @@
 
 import { Router } from "express";
 import { AppError } from "../../errors";
-import { buildDecisionView, buildRankingView } from "../../services/views";
+import { buildDecisionView, buildRankingView, buildTrendsView } from "../../services/views";
 import type { AppDeps } from "../deps";
 import { idParam } from "../http";
 
@@ -17,6 +17,11 @@ export function rankingRoutes({ db, ranking, decisions }: AppDeps): Router {
       if (!Number.isInteger(k) || k < 0 || k > 1000) throw new AppError(400, "k must be a whole number from 0 to 1000.");
     }
     res.json(buildRankingView(db, ranking, k));
+  });
+
+  // GET /api/officer/trends: eight weeks of cases and risk levels for the overview charts
+  router.get("/trends", (_req, res) => {
+    res.json(buildTrendsView(db, ranking));
   });
 
   router.get("/barangays/:id/decision", (req, res) => {

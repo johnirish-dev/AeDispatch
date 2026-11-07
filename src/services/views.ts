@@ -10,13 +10,13 @@ import { PurokCases, RiskLevel, Trend, recommendedAction, riskLevel, trend } fro
 import { toPoints } from "../algorithms/parameters";
 import type { Db } from "../db/connection";
 import { getBarangay, listBarangays } from "../db/repositories/barangayRepo";
-import { purokCases, weekCaseTotal } from "../db/repositories/caseRepo";
+import { latestCaseWeek, purokCases, weekCaseTotal } from "../db/repositories/caseRepo";
 import { getActiveParameters } from "../db/repositories/parameterRepo";
 import { ScoreRow, latestScores, scoreAtOrBefore } from "../db/repositories/scoreRepo";
 import { Bhw, listBhws } from "../db/repositories/userRepo";
 import { countActiveTasks, listRecommendations, listTasks } from "../db/repositories/workflowRepo";
 import { AppError } from "../errors";
-import { formatDate } from "../util/dates";
+import { addDays, formatDate, isoWeekLabelOf, isoWeekStart, parseIsoWeek, shiftIsoWeek } from "../util/dates";
 import { DEFAULT_MUNICIPALITY, weatherFreshness } from "./ingestion/weather";
 import type { RankingService } from "./ranking";
 import { CaseWeeks, caseWeeksAsOf } from "./scoringInputs";
@@ -248,5 +248,44 @@ export function buildDecisionView(db: Db, ranking: RankingService, barangayId: n
     openTasks: listTasks(db).filter((t) => t.barangayId === barangayId && t.status !== "completed"),
     recentDecisions: listRecommendations(db).filter((r) => r.barangayId === barangayId).slice(0, 5),
   };
+}
+
+// ---- trends (the two charts on the overview) ----------------------------------
+
+export const TREND_WEEKS = 8;
+
+export interface TrendsView {
+  weeks: string[];
+  casesPerWeek: number[];
+  riskPerWeek: Record<RiskLevel, number>[];
+}
+
+/**
+ * Eight weeks ending at the newest case week that has started. For each week:
+ * the confirmed cases of all barangays, and how many barangays sat at each risk
+ * level, read from each barangay's newest score at the end of that week (never
+ * later than now). A barangay with no score yet that week is not counted.
+ */
+export function buildTrendsView(db: Db, ranking: RankingService): TrendsView {
+  const params = getActiveParameters(db);
+  const now = ranking.now();
+  const today = formatDate(now);
+  const newest = latestCaseWeek(db, today) ?? isoWeekLabelOf(today);
+  const weeks = Array.from({ length: TREND_WEEKS }, (_, i) => shiftIsoWeek(newest, i - (TREND_WEEKS - 1)));
+  const ids = listBarangays(db).map((b) => b.id);
+
+  const riskPerWeek = weeks.map((week) => {
+    const sunday = addDays(isoWeekStart(parseIsoWeek(week)!), 6);
+    const endOfWeek = new Date(`${sunday}T23:59:59.999Z`);
+    const at = (endOfWeek < now ? endOfWeek : now).toISOString();
+    const counts: Record<RiskLevel, number> = { low: 0, moderate: 0, elevated: 0, high: 0 };
+    for (const id of ids) {
+      const score = scoreAtOrBefore(db, id, at);
+      if (score) counts[riskLevel(Math.round(score.score * 100), params)] += 1;
+    }
+    return counts;
+  });
+
+  return { weeks, casesPerWeek: weeks.map((w) => weekCaseTotal(db, w)), riskPerWeek };
 }
 
