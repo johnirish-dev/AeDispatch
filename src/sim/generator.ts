@@ -3,7 +3,8 @@
 //
 // The built-in story: a wet, warm spell hits the municipality. Barangays that
 // go on to have an outbreak show rising household, symptom and field signals
-// SIM_LEAD_WEEKS before their confirmed cases jump. That lead time is what the
+// SIM_LEAD_WEEKS before their confirmed cases jump (the ramp is 0 in that first week, so the
+// signals are visibly raised from SIM_LEAD_WEEKS - 1 weeks before the jump). That lead time is what the
 // evaluation tests. The simulator is not tuned to make AeDispatch win.
 
 import { Rng, binomial, mulberry32, poisson, randInt } from "./random";
@@ -29,6 +30,12 @@ export interface SimOptions {
   startDayOfYear?: number;
   /** Share of barangays that get an outbreak. Default 0.15. */
   outbreakFraction?: number;
+  /**
+   * Weeks before the case jump at which the household, symptom and field signals start to rise.
+   * Default SIM_LEAD_WEEKS (3). 0 means the signals rise only in the week of the jump (no early
+   * warning). The evaluation varies it to show where an early-warning advantage disappears.
+   */
+  leadWeeks?: number;
   /** Week index where the two-week wet and warm spell starts. Default: random. */
   spellWeek?: number;
   overrides?: SimOverride[];
@@ -95,6 +102,7 @@ export function generate(opts: SimOptions): SimData {
   const days = weeks * 7;
   const rng = mulberry32(opts.seed);
   const outbreakFraction = opts.outbreakFraction ?? 0.15;
+  const lead = opts.leadWeeks ?? SIM_LEAD_WEEKS;
 
   const d: SimData = {
     barangays: n,
@@ -142,8 +150,8 @@ export function generate(opts: SimOptions): SimData {
 
     const bias = 0.8 + 0.4 * rng(); // some barangays are simply more active
     for (let w = 0; w < weeks; w++) {
-      // 0 until SIM_LEAD_WEEKS before onset, then rises to 1 at onset.
-      const ramp = onset < 0 ? 0 : clamp01((w - (onset - SIM_LEAD_WEEKS)) / SIM_LEAD_WEEKS);
+      // 0 until `lead` weeks before onset, then rises to 1 at onset (a step when lead is 0).
+      const ramp = onset < 0 ? 0 : lead === 0 ? (w >= onset ? 1 : 0) : clamp01((w - (onset - lead)) / lead);
 
       for (let k = 0; k < 7; k++) {
         const i = b * days + w * 7 + k;
