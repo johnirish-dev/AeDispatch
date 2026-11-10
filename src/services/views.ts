@@ -194,6 +194,11 @@ export interface DecisionView {
   details: Record<string, unknown>;
   action: "tier1" | "monitor";
   tier1: { available: boolean; threshold: number };
+  /**
+   * A spot check is the officer's own request for an inspection where Tier 1 is not recommended.
+   * Available when Tier 1 is not available and no inspection (Tier 1 or spot check) is open.
+   */
+  spotCheck: { available: boolean };
   tier2: { unlocked: boolean; puroks: PurokCases[]; minCases: number; windowDays: number };
   /** Cases per purok over the last two case weeks, all puroks. */
   purokCases: { purokId: number; purok: string; cases: number }[];
@@ -217,6 +222,8 @@ export function buildDecisionView(db: Db, ranking: RankingService, barangayId: n
   const rec = recommendedAction(score100, cases, params);
   const raw = row.rawSummary as StoredRaw;
   const bhws = groupBhws(db).get(barangayId) ?? [];
+  const openTasks = listTasks(db).filter((t) => t.barangayId === barangayId && t.status !== "completed");
+  const inspectionOpen = openTasks.some((t) => t.type === "search_and_destroy" || t.type === "spot_check");
 
   return {
     barangay: { id: b.id, name: b.name, municipality: b.municipality, population: b.population, areaKm2: b.areaKm2 },
@@ -237,6 +244,7 @@ export function buildDecisionView(db: Db, ranking: RankingService, barangayId: n
     details: raw.details,
     action: rec.action,
     tier1: { available: rec.action === "tier1", threshold: toPoints(params.constants.tier1Threshold) },
+    spotCheck: { available: rec.action !== "tier1" && !inspectionOpen },
     tier2: {
       unlocked: rec.tier2.unlocked,
       puroks: rec.tier2.puroks,
@@ -245,7 +253,7 @@ export function buildDecisionView(db: Db, ranking: RankingService, barangayId: n
     },
     purokCases: evidence.map((p) => ({ purokId: p.purokId, purok: p.purokName, cases: p.cases })),
     team: teamOf(bhws),
-    openTasks: listTasks(db).filter((t) => t.barangayId === barangayId && t.status !== "completed"),
+    openTasks,
     recentDecisions: listRecommendations(db).filter((r) => r.barangayId === barangayId).slice(0, 5),
   };
 }

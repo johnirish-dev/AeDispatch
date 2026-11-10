@@ -32,6 +32,11 @@ export function rankingRoutes({ db, ranking, decisions }: AppDeps): Router {
     res.status(201).json(decisions.confirm(req.officer!.id, idParam(req.params.id), req.body));
   });
 
+  // An inspection the officer asks for where Tier 1 is not recommended.
+  router.post("/barangays/:id/spot-check", (req, res) => {
+    res.status(201).json(decisions.spotCheck(req.officer!.id, idParam(req.params.id), req.body));
+  });
+
   router.post("/barangays/:id/reject", (req, res) => {
     res.status(201).json(decisions.reject(req.officer!.id, idParam(req.params.id), req.body));
   });

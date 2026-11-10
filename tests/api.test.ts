@@ -187,7 +187,7 @@ describe("ranked list and decision view", () => {
     const view = await ranking(officer);
     for (const b of view.barangays) {
       expect(b.score100).toBe(Math.round(b.score * 100));
-      expect(b.action).toBe(b.score100 >= 40 ? "tier1" : "monitor");
+      expect(b.action).toBe(b.score100 >= 40 || b.tier2.unlocked ? "tier1" : "monitor");
       const level = b.score100 >= 70 ? "high" : b.score100 >= 40 ? "elevated" : b.score100 >= 25 ? "moderate" : "low";
       expect(b.riskLevel).toBe(level);
     }

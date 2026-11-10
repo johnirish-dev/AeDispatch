@@ -1,6 +1,6 @@
 // The officer's decision on a recommendation. Nothing becomes a field task
 // without an officer confirming it (ADR-04), and a confirmation needs the
-// "I have reviewed the evidence and available team capacity" tick.
+// "I have reviewed the evidence" tick.
 
 import type { Db } from "../db/connection";
 import { getBarangay } from "../db/repositories/barangayRepo";
@@ -35,7 +35,7 @@ export class Decisions {
     const body = v.bodyObject(input);
     const tier = this.tierOf(body.tier);
     if (body.reviewed !== true) {
-      throw new AppError(400, "Tick that you have reviewed the evidence and the available team capacity.");
+      throw new AppError(400, "Tick that you have reviewed the evidence.");
     }
     const view = this.eligible(barangayId, tier);
 
@@ -87,6 +87,40 @@ export class Decisions {
     })();
   }
 
+  /**
+   * Spot check: the officer asks the barangay's BHW for an inspection where Tier 1 is not
+   * recommended (a barangay they are watching). It is the officer's own call, so there is no
+   * recommendation record; the task is created for the BHW and the timeline says who asked why.
+   * Where Tier 1 is recommended the officer uses Tier 1 instead, and only one inspection can be
+   * open for a barangay at a time.
+   */
+  spotCheck(officerId: number, barangayId: number, input: unknown) {
+    const body = v.bodyObject(input);
+    if (body.reviewed !== true) {
+      throw new AppError(400, "Tick that you have reviewed the evidence.");
+    }
+    const note = v.optionalText(body.note, "note", 300);
+    if (!getBarangay(this.db, barangayId)) throw new AppError(404, "Barangay not found.");
+    const view = buildDecisionView(this.db, this.ranking, barangayId);
+    const name = view.barangay.name;
+    if (view.tier1.available) {
+      throw new AppError(409, `Tier 1 is already recommended for ${name}. Use Tier 1 instead of a spot check.`);
+    }
+    if (hasOpenTask(this.db, barangayId, "search_and_destroy") || hasOpenTask(this.db, barangayId, "spot_check")) {
+      throw new AppError(409, `${name} already has an open inspection.`);
+    }
+    const bhw = listBhws(this.db).find((b) => b.barangayId === barangayId);
+    if (!bhw) throw new AppError(409, `No BHW is assigned to ${name}. Assign one before asking for a spot check.`);
+
+    const at = this.ranking.now().toISOString();
+    return this.db.transaction(() => {
+      // No purok list: the BHW decides which puroks and houses to visit.
+      const taskId = createTask(this.db, { recommendationId: null, barangayId, bhwId: bhw.id, type: "spot_check", puroks: [], status: "new", at });
+      addEvent(this.db, "decision", `Assigned a spot check for ${name}${note ? `: "${note}"` : ""}`, at);
+      return { taskId, type: "spot_check" as const, bhw: bhw.displayName };
+    })();
+  }
+
   private tierOf(value: unknown): 1 | 2 {
     return (value === undefined ? 1 : v.int(value, "tier", 1, 2)) as 1 | 2;
   }
@@ -96,7 +130,7 @@ export class Decisions {
     if (!getBarangay(this.db, barangayId)) throw new AppError(404, "Barangay not found.");
     const view = buildDecisionView(this.db, this.ranking, barangayId);
     if (tier === 1 && !view.tier1.available) {
-      throw new AppError(409, `Tier 1 is recommended from a score of ${view.tier1.threshold}. ${view.barangay.name} is at ${view.score.score100}.`);
+      throw new AppError(409, `Tier 1 is recommended from a score of ${view.tier1.threshold}, or where a purok has a confirmed cluster. ${view.barangay.name} is at ${view.score.score100}.`);
     }
     if (tier === 2 && !view.tier2.unlocked) {
       throw new AppError(409, "Tier 2 is locked. A high risk score alone never authorizes fogging; it needs more than 2 confirmed cases in one purok.");

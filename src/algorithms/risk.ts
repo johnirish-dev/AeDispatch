@@ -52,7 +52,12 @@ export function tier2Status(
 export type Action = "tier1" | "monitor";
 
 export interface Recommendation {
-  /** Tier 1 (search and destroy / larviciding) or just keep monitoring. */
+  /**
+   * Tier 1 (search and destroy / larviciding) or just keep monitoring. Tier 1 is recommended from
+   * the score threshold, and also wherever a Tier 2 cluster is open: fogging is only ever a
+   * review on top of a field inspection, so a barangay with a confirmed cluster never reads
+   * "Monitor".
+   */
   action: Action;
   /** Independent of the action: only the purok case counts decide it. */
   tier2: Tier2Status;
@@ -63,10 +68,13 @@ export function recommendedAction(
   purokCases: PurokCases[],
   p: ModelParameters,
 ): Recommendation {
+  const tier2 = tier2Status(purokCases, p);
   return {
     action:
-      score100 >= toPoints(p.constants.tier1Threshold) ? "tier1" : "monitor",
-    tier2: tier2Status(purokCases, p),
+      score100 >= toPoints(p.constants.tier1Threshold) || tier2.unlocked
+        ? "tier1"
+        : "monitor",
+    tier2,
   };
 }
 

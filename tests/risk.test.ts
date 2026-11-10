@@ -102,8 +102,12 @@ describe("recommendedAction", () => {
 
   it("Tier 2 depends on purok cases, not on the score", () => {
     const r = recommendedAction(10, [{ purok: "Purok 4", cases: 3 }], P);
-    expect(r.action).toBe("monitor");
     expect(r.tier2.unlocked).toBe(true);
+  });
+
+  it("a Tier 2 cluster keeps the field inspection (Tier 1) open even when the score is low", () => {
+    expect(recommendedAction(10, [{ purok: "Purok 4", cases: 3 }], P).action).toBe("tier1");
+    expect(recommendedAction(10, [{ purok: "Purok 4", cases: 2 }], P).action).toBe("monitor");
   });
 });
 
