@@ -1,3 +1,4 @@
+import path from "node:path";
 import express from "express";
 import path from "node:path";
 import { authRoutes, requireBhw, requireOfficer } from "./api/auth";
@@ -34,9 +35,16 @@ export function createApp(deps?: AppDeps) {
   }
 
   app.use("/api", notFound);
+
+
+  // The pages. Mounted after the API so a page can never shadow a route.
+  // `__dirname` is src/ while developing and dist/ after a build; both sit next to src/web.
+  app.get("/", (_req, res) => res.redirect(302, "/officer/"));
+  app.use(express.static(path.join(__dirname, "..", "src", "web")));
   app.use((_req, res) => {
-    res.status(404).type("text/plain").send("Not Found");
+    res.status(404).type("text/plain").send("Page not found.");
   });
+
   app.use(errorHandler);
   return app;
 }
