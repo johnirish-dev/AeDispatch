@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision" viewBox="200 540 1540 840" role="img" aria-label="AeDispatch">
+  <g fill="#2c5073" stroke="#f7f7f7" stroke-width="16" stroke-linejoin="miter">
+    <polygon points="214,622 1018,795 1046,771 1158,771 686,935 556,935"/>
+    <polygon points="1222,770 648,972 503,1092 945,1055 1140,855"/>
+    <polygon points="1150,872 1172,905 1047,1240 930,1100"/>
+    <polygon points="1184,885 1242,992 1178,948"/>
+    <polygon points="557,1108 918,1074 820,1277"/>
+    <polygon points="503,1100 765,1273 473,1366"/>
+  </g>
+  <g fill="none" stroke-linecap="butt">
+    <path d="M1320 785 A264 264 0 0 1 1320 1115" stroke="#f39c2f" stroke-width="52"/>
+    <path d="M1412 697 A345 345 0 0 1 1412 1203" stroke="#36a38a" stroke-width="66"/>
+    <path d="M1510 603 A440 440 0 0 1 1510 1297" stroke="#36a38a" stroke-width="76"/>
+  </g>
+</svg>

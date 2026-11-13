@@ -1,0 +1,87 @@
+/* Fonts are stored in the project (shared/fonts), so no page asks another server for them. */
+@font-face { font-family: "Manrope"; font-style: normal; font-weight: 400 700; font-display: swap; src: url("fonts/manrope-latin-var.woff2") format("woff2"); }
+
+/* Design tokens. Every colour, size and space used anywhere else comes from here.
+   The look follows the reference dashboard the team chose: a floating frame, a light
+   sidebar, white rounded cards on a near-white panel, and one family of greens. */
+:root {
+  /* greens (sampled from the reference dashboard) */
+  --brand: #1f7a50;        /* primary green */
+  --brand-dark: #175a3a;   /* buttons, strong text */
+  --brand-deep: #13452d;   /* the darkest accent bars */
+  --brand-night: #113615;  /* the dark card */
+  --brand-hover: #0f4a2f;
+  --green-mid: #5fbd92;    /* the lighter series colour */
+  --green-soft: #8dcc99;
+  --orange: #f39c2f;       /* only in the logo and small highlights */
+  --navy: #2c5073;         /* only in the logo */
+
+  /* surfaces */
+  --bg: #e6e7e8;           /* the page behind the frame */
+  --panel: #f7f7f7;       /* sidebar and the main panel */
+  --surface: #ffffff;     /* cards */
+  --header-row: #f0f2f1;
+  --tint: #f4f6f5;
+  --mint: #e4f1e9;
+
+  /* text */
+  --ink: #101412;
+  --muted: #5f6b65;
+  --on-dark: #f1f8f3;
+  --on-dark-muted: #b4d3c1;
+
+  /* lines */
+  --line: #e4e8e6;
+  --line-strong: #9aa59f;
+
+  /* selection and focus */
+  --accent: #175a3a;
+  --accent-tint: #e8f3ec;
+
+  /* risk: text on tint (6:1 or better) */
+  --low-ink: #14532d;   --low-bg: #dcfce7;
+  --mod-ink: #713f12;   --mod-bg: #fef3c7;
+  --elev-ink: #9a3412;  --elev-bg: #ffedd5;
+  --high-ink: #991b1b;  --high-bg: #fee2e2;
+
+  /* risk: fills for bars and charts (4.9:1 or better on white) */
+  --low-fill: #2a7d3f;  --mod-fill: #a16207;  --elev-fill: #c2410c;  --high-fill: #b91c1c;
+
+  /* feedback */
+  --error: #b42318;     --error-bg: #fef3f2;
+  --success: #14532d;   --success-bg: #ecfdf3;
+  --info: #175a3a;      --info-bg: #e8f3ec;
+
+  /* shape: big soft cards, pill buttons, medium inputs */
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 20px;
+  --r-xl: 24px;
+  --r-pill: 999px;
+
+  /* space (4 px grid) */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 48px;
+
+  /* type: a wide, geometric sans (Manrope) */
+  --font: "Manrope", -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-head: var(--font);
+  --fs-xs: 12px;
+  --fs-sm: 13px;
+  --fs-md: 14px;
+  --fs-lg: 16px;
+  --fs-xl: 20px;
+  --fs-2xl: 28px;
+  --fs-3xl: 36px;
+
+  /* motion: one strong ease-out, used for hover, press and the sidebar */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+
+  /* depth: a hairline lift */
+  --shadow: 0 1px 2px rgba(16, 20, 18, 0.04);
+}
