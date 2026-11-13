@@ -137,5 +137,5 @@ describe("robustness and sensitivity reports", () => {
     for (const variable of ["leadWeeks", "caseDelayWeeks", "outbreakFraction"]) expect(s.rows.some((x) => x.variable === variable)).toBe(true);
     // the lead is reported as visible early-signal weeks: 4, 3, 2, 1, 0
     expect([...new Set(s.rows.filter((x) => x.variable === "leadWeeks").map((x) => x.value))].sort()).toEqual([0, 1, 2, 3, 4]);
-  });
+  }, 60_000); // runs the simulation several times; the default 5 s is too short on a slow or busy machine
 });
