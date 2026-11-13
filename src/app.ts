@@ -1,4 +1,5 @@
 import express from "express";
+import path from "node:path";
 import { authRoutes, requireBhw, requireOfficer } from "./api/auth";
 import type { AppDeps } from "./api/deps";
 import { errorHandler, notFound } from "./api/http";
@@ -15,6 +16,12 @@ export function createApp(deps?: AppDeps) {
   const app = express();
   app.use(express.json({ limit: "2mb" })); // a 1 MB case file, plus JSON escaping
 
+  app.get("/", (_req, res) => {
+    res.redirect(302, "/officer/");
+  });
+  app.use(express.static(path.join(__dirname, "web")));
+  app.use(express.static(path.join(__dirname, "..", "src", "web")));
+
   app.get("/api/health", (_req, res) => {
     res.json({ status: "ok" });
   });
@@ -27,6 +34,9 @@ export function createApp(deps?: AppDeps) {
   }
 
   app.use("/api", notFound);
+  app.use((_req, res) => {
+    res.status(404).type("text/plain").send("Not Found");
+  });
   app.use(errorHandler);
   return app;
 }
