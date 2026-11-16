@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AeDispatch — Resident Portal</title>
   <link rel="icon" type="image/svg+xml" href="/shared/favicon.svg">
   <link rel="stylesheet" href="/shared/tokens.css">
@@ -10,112 +10,265 @@
   <link rel="stylesheet" href="/shared/components.css">
   <link rel="stylesheet" href="/resident/resident.css">
 </head>
-<body>
+<body class="no-nav">
   <div class="app-shell">
 
-    <!-- Top Location Header (Shown on Home) -->
-    <header class="topbar" id="main-topbar">
+    <!-- Top bar: shown on Home only -->
+    <header class="topbar" id="main-topbar" hidden>
       <div class="location-wrap">
         <div class="brand-mark">
-          <img src="/shared/logo.svg" alt="AeDispatch">
+          <img src="/shared/logo.svg" alt="">
         </div>
         <div class="location-meta">
-          <span class="location-label">Your location</span>
-          <select id="barangay-select" class="location-select" aria-label="Select Barangay">
-            <option value="sagpon">Brgy. Sagpon, Daraga</option>
-            <option value="penafrancia">Brgy. Peñafrancia, Daraga</option>
-            <option value="bascaran">Brgy. Bascaran, Daraga</option>
-            <option value="old-albay">Brgy. Old Albay, Legazpi</option>
-          </select>
+          <span class="location-label" data-i18n="home.location">Your location</span>
+          <select id="barangay-select" class="location-select" data-i18n-aria="home.selectAria"></select>
         </div>
       </div>
 
-      <button type="button" class="alert-icon-btn" id="open-alerts-btn" aria-label="View Alerts">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-          <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-        </svg>
-        <span class="alert-dot"></span>
-      </button>
+      <div class="topbar-actions">
+        <div class="lang-toggle" role="group" data-i18n-aria="lang.aria">
+          <button type="button" data-lang="en" aria-pressed="true">EN</button>
+          <button type="button" data-lang="fil" aria-pressed="false">FIL</button>
+        </div>
+        <button type="button" class="alert-icon-btn" id="open-alerts-btn" data-i18n-aria="home.alertsAria">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+          </svg>
+          <span class="alert-dot" id="alert-dot" hidden></span>
+        </button>
+      </div>
     </header>
+
+    <!-- =========================================================
+         ONBOARDING 1 · SPLASH
+         ========================================================= -->
+    <section class="screen onboarding center-screen" id="screen-splash">
+      <img class="splash-logo" src="/shared/logo.svg" alt="AeDispatch">
+      <h1 class="splash-name" data-i18n="app.name">AeDispatch</h1>
+      <p class="splash-tagline" data-i18n="splash.tagline">Dengue alerts for your barangay</p>
+      <p class="splash-footer muted-text" data-i18n="splash.footer">Daraga Municipal Health Office</p>
+    </section>
+
+    <!-- =========================================================
+         ONBOARDING 2 · THREE INTRO SLIDES
+         ========================================================= -->
+    <section class="screen onboarding" id="screen-intro">
+      <div class="onb-top">
+        <div class="lang-toggle" role="group" data-i18n-aria="lang.aria">
+          <button type="button" data-lang="en" aria-pressed="true">EN</button>
+          <button type="button" data-lang="fil" aria-pressed="false">FIL</button>
+        </div>
+        <button type="button" class="btn-text-link" id="intro-skip" data-i18n="intro.skip">Skip</button>
+      </div>
+
+      <div class="slide-body">
+        <div class="orb orb-amber" id="intro-orb" aria-hidden="true">
+          <span class="orb-core">
+            <svg id="intro-icon-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+            <svg id="intro-icon-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" hidden><polyline points="20 6 9 17 4 12"></polyline></svg>
+            <svg id="intro-icon-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" hidden><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><polyline points="9 12 11 14 15 10"></polyline></svg>
+          </span>
+        </div>
+        <h1 class="onb-title" id="intro-title"></h1>
+        <p class="onb-body" id="intro-body"></p>
+      </div>
+
+      <div class="onb-bottom">
+        <div class="dots" id="intro-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+        <button type="button" class="btn-primary-pill" id="intro-next"></button>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         ONBOARDING 3 · WHERE DO YOU LIVE?
+         ========================================================= -->
+    <section class="screen onboarding" id="screen-barangay">
+      <div class="onb-top">
+        <button type="button" class="back-btn" id="bgy-back">&lsaquo; <span data-i18n="bgy.back">Back</span></button>
+        <div class="lang-toggle" role="group" data-i18n-aria="lang.aria">
+          <button type="button" data-lang="en" aria-pressed="true">EN</button>
+          <button type="button" data-lang="fil" aria-pressed="false">FIL</button>
+        </div>
+      </div>
+
+      <div>
+        <h1 class="section-title" data-i18n="bgy.title">Where do you live?</h1>
+        <p class="muted-text" style="margin-top: 6px;" data-i18n="bgy.sub">We'll show dengue alerts for your barangay.</p>
+      </div>
+
+      <label class="search-field">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <input type="search" id="bgy-search" autocomplete="off" data-i18n-placeholder="bgy.search" data-i18n-aria="bgy.search">
+      </label>
+
+      <div class="bgy-list" id="bgy-list" role="radiogroup" data-i18n-aria="bgy.title"></div>
+      <p class="muted-text" id="bgy-nomatch" role="status" hidden></p>
+
+      <div class="notice-card" id="bgy-notlisted" role="status" hidden>
+        <h2 class="card-title" data-i18n="bgy.notListedTitle">Your barangay isn't in the system yet</h2>
+        <p class="muted-text" style="color: var(--res-text);" data-i18n="bgy.notListedBody"></p>
+      </div>
+
+      <div class="onb-actions">
+        <button type="button" class="btn-primary-pill" id="bgy-continue" disabled data-i18n="bgy.continue">Continue</button>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         ONBOARDING 4 · GET ALERTS
+         ========================================================= -->
+    <section class="screen onboarding" id="screen-alertsopt">
+      <div class="onb-top">
+        <button type="button" class="back-btn" id="alertsopt-back">&lsaquo; <span data-i18n="bgy.back">Back</span></button>
+      </div>
+
+      <div class="slide-body">
+        <div class="orb orb-amber" aria-hidden="true">
+          <span class="orb-core">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+          </span>
+        </div>
+        <h1 class="onb-title" data-i18n="alertsopt.title">Get alerts on your phone</h1>
+        <p class="onb-body" id="alertsopt-body"></p>
+        <div class="sample-notification">
+          <img src="/shared/logo.svg" alt="">
+          <div>
+            <div class="sample-top"><strong data-i18n="app.name">AeDispatch</strong><span class="muted-text" data-i18n="alertsopt.now">now</span></div>
+            <p class="muted-text" style="color: var(--res-text);" id="alertsopt-sample"></p>
+          </div>
+        </div>
+        <p class="muted-text" data-i18n="alertsopt.note">Prototype: alerts appear inside this app only.</p>
+      </div>
+
+      <div class="onb-actions">
+        <button type="button" class="btn-primary-pill" id="alertsopt-on" data-i18n="alertsopt.on">Turn on alerts</button>
+        <button type="button" class="btn-text-link" id="alertsopt-off" data-i18n="alertsopt.off">Not now</button>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         DAILY CHECK-IN (full screen, once a day, can be skipped)
+         ========================================================= -->
+    <section class="screen onboarding" id="screen-checkin">
+      <div class="onb-top">
+        <span></span>
+        <button type="button" class="btn-text-link" id="checkin-skip" data-i18n="checkin.skip">Skip</button>
+      </div>
+
+      <div class="slide-body" id="checkin-ask">
+        <div class="orb orb-teal" aria-hidden="true">
+          <span class="orb-core">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+          </span>
+        </div>
+        <span class="tag-pill" data-i18n="checkin.tag">DAILY CHECK-IN</span>
+        <h1 class="onb-title" data-i18n="checkin.title">Have you noticed more daytime mosquitoes than usual?</h1>
+        <p class="onb-body" data-i18n="checkin.sub">One tap. It helps your health team decide where to check first.</p>
+      </div>
+
+      <div class="slide-body" id="checkin-thanks" hidden>
+        <div class="orb orb-teal" aria-hidden="true">
+          <span class="orb-core">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          </span>
+        </div>
+        <h1 class="onb-title" data-i18n="checkin.thanks">Thank you!</h1>
+        <p class="onb-body" data-i18n="checkin.thanksSub">Your answer helps your health team.</p>
+      </div>
+
+      <div class="onb-actions" id="checkin-ask-actions">
+        <button type="button" class="btn-primary-pill" data-checkin="yes" data-i18n="checkin.yes">Yes, more than usual</button>
+        <button type="button" class="btn-secondary-pill" data-checkin="no" data-i18n="checkin.no">No, about the same</button>
+        <p class="muted-text center-text" data-i18n="checkin.note">Anonymous. Counted by barangay only.</p>
+      </div>
+
+      <div class="onb-actions" id="checkin-thanks-actions" hidden>
+        <button type="button" class="btn-primary-pill" id="checkin-report" data-i18n="checkin.report">Report something at home (optional)</button>
+        <button type="button" class="btn-text-link" id="checkin-done" data-i18n="checkin.done">Done</button>
+      </div>
+    </section>
 
     <!-- =========================================================
          R1 · HOME
          ========================================================= -->
-    <section class="screen active" id="screen-home">
-      <div class="card hero-card" id="home-hero-card">
-        <span class="status-pill pill-elevated" id="home-risk-pill">Elevated risk</span>
-        <h1 class="section-title" style="margin-top: 10px;" id="home-headline">
-          Conditions favor mosquito hatching through Sunday.
-        </h1>
+    <section class="screen" id="screen-home">
+      <div id="home-listed" class="stack">
+        <div class="card hero-card" id="home-hero-card">
+          <span class="status-pill pill-elevated" id="home-risk-pill"></span>
+          <h1 class="section-title" style="margin-top: 10px;" id="home-headline"></h1>
 
-        <div class="risk-meter">
-          <div class="meter-track" id="meter-track">
-            <div class="meter-seg"></div>
-            <div class="meter-seg"></div>
-            <div class="meter-seg active-elev"></div>
-            <div class="meter-seg"></div>
+          <div class="risk-meter">
+            <div class="meter-track" id="meter-track">
+              <div class="meter-seg"></div>
+              <div class="meter-seg"></div>
+              <div class="meter-seg"></div>
+              <div class="meter-seg"></div>
+            </div>
+            <div class="meter-labels" id="meter-labels">
+              <span data-i18n="level.low">Low</span>
+              <span data-i18n="level.moderate">Moderate</span>
+              <span data-i18n="level.elevated">Elevated</span>
+              <span data-i18n="level.high">High</span>
+            </div>
           </div>
-          <div class="meter-labels" id="meter-labels">
-            <span>Low</span>
-            <span>Moderate</span>
-            <span class="active">Elevated</span>
-            <span>High</span>
+
+          <button type="button" class="btn-outline-pill" id="open-warning-btn">
+            <span data-i18n="home.why">Why and what to do</span> &rsaquo;
+          </button>
+        </div>
+
+        <!-- 7-day breeding outlook -->
+        <div class="card">
+          <div class="card-header-row">
+            <div>
+              <h2 class="card-title" data-i18n="home.outlook">7-day breeding outlook</h2>
+              <p class="muted-text" data-i18n="home.outlookNote">Illustrative forecast · not live weather</p>
+            </div>
+            <span class="outline-pill" id="peak-badge"></span>
+          </div>
+          <div class="outlook-bars" id="outlook-bars" role="img"></div>
+        </div>
+
+        <!-- Daily question: no sign-in -->
+        <div class="card" id="daily-card">
+          <div id="daily-ask">
+            <h2 class="card-title" data-i18n="daily.question">Have you noticed more daytime mosquitoes than usual?</h2>
+            <div class="pulse-actions">
+              <button type="button" class="btn-outline-pill" data-pulse="yes" data-i18n="daily.yes">Yes</button>
+              <button type="button" class="btn-outline-pill" data-pulse="no" data-i18n="daily.no">No</button>
+              <button type="button" class="btn-text-link" id="skip-pulse-btn" data-i18n="daily.skip">Skip</button>
+            </div>
+          </div>
+          <div id="daily-thanks" hidden>
+            <h2 class="card-title" data-i18n="daily.thanksTitle">Thanks for today's check-in</h2>
+            <p class="muted-text" data-i18n="daily.thanksBody">Come back tomorrow. Your answer helps your health team.</p>
           </div>
         </div>
 
-        <button type="button" class="btn-outline-pill" id="open-warning-btn">
-          Why and what to do &rsaquo;
-        </button>
+        <!-- Do today -->
+        <div class="card">
+          <h2 class="card-title" style="margin-bottom: 10px;" data-i18n="home.doToday">Do today</h2>
+          <div class="check-list">
+            <label class="inline-check"><input type="checkbox"><span data-i18n="home.do1">Empty and scrub standing water</span></label>
+            <label class="inline-check"><input type="checkbox"><span data-i18n="home.do2">Cover water drums</span></label>
+            <label class="inline-check"><input type="checkbox"><span data-i18n="home.do3">Use daytime mosquito protection</span></label>
+          </div>
+        </div>
+
+        <!-- Optional report: this is the only thing that needs sign-in -->
+        <div class="card">
+          <h2 class="card-title" data-i18n="reportcard.title">Anything around your home?</h2>
+          <p class="muted-text" data-i18n="reportcard.body">Optional. You'll sign in with your mobile number to send a report.</p>
+          <button type="button" class="btn-outline-pill" id="open-report-btn" style="margin-top: 12px;" data-i18n="reportcard.btn">Report what you see</button>
+        </div>
       </div>
 
-      <!-- 7-day breeding outlook -->
-      <div class="card">
-        <div class="card-header-row">
-          <div>
-            <h2 class="card-title">7-day breeding outlook</h2>
-            <p class="muted-text">Illustrative forecast &middot; not live weather</p>
-          </div>
-          <span class="outline-pill" id="peak-badge">Peaks Fri</span>
-        </div>
-
-        <div class="outlook-bars" id="outlook-bars">
-          <div class="bar-col"><div class="bar-fill" style="height: 36px;"></div><span class="bar-day">W</span></div>
-          <div class="bar-col"><div class="bar-fill" style="height: 44px;"></div><span class="bar-day">T</span></div>
-          <div class="bar-col"><div class="bar-fill peak" style="height: 54px;"></div><span class="bar-day">F</span></div>
-          <div class="bar-col"><div class="bar-fill" style="height: 42px;"></div><span class="bar-day">S</span></div>
-          <div class="bar-col"><div class="bar-fill" style="height: 34px;"></div><span class="bar-day">S</span></div>
-          <div class="bar-col"><div class="bar-fill" style="height: 26px;"></div><span class="bar-day">M</span></div>
-          <div class="bar-col"><div class="bar-fill" style="height: 24px;"></div><span class="bar-day">T</span></div>
-        </div>
-      </div>
-
-      <!-- Do today (All unchecked by default) -->
-      <div class="card">
-        <h2 class="card-title" style="margin-bottom: 10px;">Do today</h2>
-        <div class="check-list">
-          <label class="inline-check">
-            <input type="checkbox">
-            <span>Empty and scrub standing water</span>
-          </label>
-          <label class="inline-check">
-            <input type="checkbox">
-            <span>Cover water drums</span>
-          </label>
-          <label class="inline-check">
-            <input type="checkbox">
-            <span>Use daytime mosquito protection</span>
-          </label>
-        </div>
-      </div>
-
-      <!-- Daily Mosquito Pulse (Unselected by default -> Opens R5 Household Report) -->
-      <div class="card">
-        <h2 class="card-title">Have you noticed more daytime mosquitoes than usual?</h2>
-        <div class="pulse-actions">
-          <button type="button" class="btn-outline-pill" data-pulse="yes">Yes</button>
-          <button type="button" class="btn-outline-pill" data-pulse="no">No</button>
-          <button type="button" class="btn-text-link" id="skip-pulse-btn">Skip</button>
+      <div id="home-nolisting" class="stack" hidden>
+        <div class="card notice-card">
+          <h1 class="section-title" data-i18n="home.noListingTitle">Your barangay isn't in the system yet</h1>
+          <p class="muted-text" style="margin-top: 8px;" data-i18n="home.noListingBody"></p>
+          <button type="button" class="btn-outline-pill" id="choose-barangay-btn" style="margin-top: 14px;" data-i18n="bgy.choose">Choose a barangay</button>
         </div>
       </div>
     </section>
@@ -125,210 +278,211 @@
          ========================================================= -->
     <section class="screen" id="screen-warning">
       <div class="sub-header">
-        <button type="button" class="back-btn" data-go="screen-home">&lsaquo; Early warning</button>
+        <button type="button" class="back-btn" data-go="screen-home">&lsaquo; <span data-i18n="warn.back">Early warning</span></button>
       </div>
 
       <div>
-        <p class="muted-text" style="margin-bottom: 4px;">Wed, Oct 21 to Sun, Oct 25</p>
-        <h1 class="section-title">Mosquito-hatching conditions ahead</h1>
+        <p class="muted-text" style="margin-bottom: 4px;" id="warn-dates"></p>
+        <h1 class="section-title" data-i18n="warn.title">Mosquito-hatching conditions ahead</h1>
       </div>
 
       <div>
-        <h2 class="card-title" style="margin-bottom: 8px;">Why you got this</h2>
+        <h2 class="card-title" style="margin-bottom: 8px;" data-i18n="warn.why">Why you got this</h2>
         <div class="two-col">
           <div class="card stat-card-amber">
-            <span class="card-title" style="font-size: 0.86rem;">Temperature</span>
-            <div class="stat-value">28 to 31&deg;C</div>
-            <p class="muted-text">Ideal range for Aedes to breed and bite.</p>
+            <span class="card-title" style="font-size: 0.86rem;" data-i18n="warn.temp">Temperature</span>
+            <div class="stat-value" data-i18n="warn.tempValue">28 to 31 °C</div>
+            <p class="muted-text" data-i18n="warn.tempNote">Ideal range for Aedes to breed and bite.</p>
           </div>
           <div class="card stat-card-teal">
-            <span class="card-title" style="font-size: 0.86rem;">Rain</span>
-            <div class="stat-value">4 of 7 days</div>
-            <p class="muted-text">Rain refills containers and triggers eggs to hatch.</p>
+            <span class="card-title" style="font-size: 0.86rem;" data-i18n="warn.rain">Rain</span>
+            <div class="stat-value" data-i18n="warn.rainValue">4 of 7 days</div>
+            <p class="muted-text" data-i18n="warn.rainNote">Rain refills containers and triggers eggs to hatch.</p>
           </div>
         </div>
       </div>
 
       <div>
-        <h2 class="card-title" style="margin-bottom: 8px;">What you can do now</h2>
+        <h2 class="card-title" style="margin-bottom: 8px;" data-i18n="warn.do">What you can do now</h2>
         <div class="check-list">
           <div class="step-card">
             <span class="step-badge">1</span>
             <div>
-              <div class="card-title" style="font-size: 0.9rem;">Empty standing water</div>
-              <p class="muted-text">Tip out pails, plant saucers and vases.</p>
+              <div class="card-title" style="font-size: 0.9rem;" data-i18n="warn.s1.t">Empty standing water</div>
+              <p class="muted-text" data-i18n="warn.s1.d">Tip out pails, plant saucers and vases.</p>
             </div>
           </div>
           <div class="step-card">
             <span class="step-badge">2</span>
-            <div>
-              <div class="card-title" style="font-size: 0.9rem;">Cover water drums and pails</div>
-            </div>
+            <div><div class="card-title" style="font-size: 0.9rem;" data-i18n="warn.s2.t">Cover water drums and pails</div></div>
           </div>
           <div class="step-card">
             <span class="step-badge">3</span>
-            <div>
-              <div class="card-title" style="font-size: 0.9rem;">Clear gutters and drains</div>
-            </div>
+            <div><div class="card-title" style="font-size: 0.9rem;" data-i18n="warn.s3.t">Clear gutters and drains</div></div>
           </div>
           <div class="step-card">
             <span class="step-badge">4</span>
-            <div>
-              <div class="card-title" style="font-size: 0.9rem;">Protect yourself throughout the day</div>
-            </div>
+            <div><div class="card-title" style="font-size: 0.9rem;" data-i18n="warn.s4.t">Protect yourself throughout the day</div></div>
           </div>
         </div>
       </div>
 
       <div class="dual-actions">
-        <button type="button" class="btn-outline-pill" id="copy-tips-btn">Copy tips</button>
-        <button type="button" class="btn-primary-pill" data-go="screen-home">Got it</button>
+        <button type="button" class="btn-outline-pill" id="copy-tips-btn" data-i18n="warn.copy">Copy tips</button>
+        <button type="button" class="btn-primary-pill" data-go="screen-home" data-i18n="warn.got">Got it</button>
       </div>
     </section>
 
     <!-- =========================================================
-         R3 · ALERTS (No SMS section)
+         R3 · ALERTS (and the demo SMS messages)
          ========================================================= -->
     <section class="screen" id="screen-alerts">
       <div class="sub-header">
-        <button type="button" class="back-btn" data-go="screen-home">&lsaquo; Alerts</button>
+        <button type="button" class="back-btn" data-go="screen-home">&lsaquo; <span data-i18n="alerts.back">Alerts</span></button>
       </div>
 
       <div>
-        <h1 class="section-title">Alerts</h1>
-        <p class="muted-text" id="alerts-barangay-label">Brgy. Sagpon, Daraga</p>
+        <h1 class="section-title" data-i18n="alerts.title">Alerts</h1>
+        <p class="muted-text" id="alerts-barangay-label"></p>
       </div>
 
-      <div class="card alert-card-elevated">
-        <div class="card-header-row" style="margin-bottom: 6px;">
-          <h2 class="card-title">Elevated risk</h2>
-          <span class="muted-text">Today 6:00 AM</span>
-        </div>
-        <p class="muted-text" style="color: var(--res-text); margin-bottom: 10px;">
-          Conditions favor mosquito hatching through Sunday.
-        </p>
-        <span class="status-pill pill-elevated">Early warning</span>
+      <div class="card state-row">
+        <span class="card-title" id="alerts-state"></span>
+        <button type="button" class="btn-outline-pill" id="alerts-toggle"></button>
       </div>
 
-      <div class="card alert-card-moderate">
-        <div class="card-header-row" style="margin-bottom: 6px;">
-          <h2 class="card-title">Moderate risk</h2>
-          <span class="muted-text">Mon, Oct 19</span>
-        </div>
-        <p class="muted-text" style="color: var(--res-text); margin-bottom: 10px;">
-          Keep containers covered and empty after rain.
-        </p>
-        <span class="status-pill pill-moderate">Early warning</span>
+      <div id="alerts-list" class="stack"></div>
+
+      <div>
+        <h2 class="card-title" style="margin-bottom: 8px;" data-i18n="alerts.messages">Messages</h2>
+        <div id="messages-list" class="stack"></div>
       </div>
     </section>
 
     <!-- =========================================================
-         R5 · HOUSEHOLD REPORT (All unchecked by default)
+         R4 · SIGN IN (only to send a report)
          ========================================================= -->
-    <section class="screen" id="screen-report">
-      <div class="sub-header">
-        <button type="button" class="back-btn" data-go="screen-home" aria-label="Close">&times; Close</button>
-        <span class="muted-text" style="font-weight: 700;">Optional &middot; 1 minute</span>
+    <section class="screen onboarding" id="screen-signin">
+      <div class="onb-top">
+        <button type="button" class="back-btn" data-go="screen-home">&lsaquo; <span data-i18n="signin.back">Back</span></button>
       </div>
 
       <div>
-        <h1 class="section-title">Anything around your home?</h1>
-        <p class="muted-text" style="margin-top: 4px;">Tick everything you noticed. Leave blank if all clear.</p>
+        <div class="orb-small" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+        </div>
+        <h1 class="section-title" style="margin-top: 14px;" data-i18n="signin.title">Sign in to contribute</h1>
+        <p class="muted-text" style="margin-top: 6px;" data-i18n="signin.sub">Only needed when you send a report. No password.</p>
+      </div>
+
+      <form id="signin-form" novalidate class="stack">
+        <label class="field-label" for="phone-input" data-i18n="signin.mobile">Mobile number</label>
+        <div class="phone-field">
+          <span class="phone-prefix">+63</span>
+          <input id="phone-input" type="tel" inputmode="numeric" autocomplete="off" maxlength="10" placeholder="912 345 6789">
+        </div>
+        <p class="field-error" id="phone-error" role="alert" hidden></p>
+        <button type="submit" class="btn-primary-pill" data-i18n="signin.send">Send one-time PIN</button>
+      </form>
+
+      <p class="privacy-note" data-i18n="signin.privacy">Viewing alerts never needs sign-in. Your number is never shown to others.</p>
+    </section>
+
+    <section class="screen onboarding" id="screen-pin">
+      <div class="onb-top">
+        <button type="button" class="back-btn" id="pin-back">&lsaquo; <span data-i18n="signin.back">Back</span></button>
+      </div>
+
+      <div>
+        <h1 class="section-title" data-i18n="pin.title">Enter the 6-digit PIN</h1>
+        <p class="muted-text" style="margin-top: 6px;" id="pin-sub"></p>
+      </div>
+
+      <div class="pin-boxes" id="pin-boxes"></div>
+      <p class="field-error" id="pin-error" role="alert" hidden></p>
+
+      <div class="pin-meta">
+        <span class="muted-text" id="pin-resend-text"></span>
+        <span class="demo-pill" id="pin-demo"></span>
+      </div>
+      <button type="button" class="btn-text-link" id="pin-resend" hidden data-i18n="pin.resend">Resend PIN</button>
+      <button type="button" class="btn-text-link" id="pin-change" data-i18n="pin.change">Change number</button>
+
+      <div class="onb-actions">
+        <button type="button" class="btn-primary-pill" id="pin-verify" data-i18n="pin.verify">Verify</button>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         R5 · HOUSEHOLD REPORT (after sign-in)
+         ========================================================= -->
+    <section class="screen" id="screen-report">
+      <div class="sub-header">
+        <button type="button" class="back-btn" data-go="screen-home">&times; <span data-i18n="report.close">Close</span></button>
+        <span class="muted-text" style="font-weight: 700;" data-i18n="report.optional">Optional · 1 minute</span>
+      </div>
+
+      <div>
+        <h1 class="section-title" data-i18n="report.title">Anything around your home?</h1>
+        <p class="muted-text" style="margin-top: 4px;" data-i18n="report.sub">Tick everything you noticed. Leave blank if all clear.</p>
       </div>
 
       <form id="household-report-form" class="check-list">
-        <label class="box-check">
-          <input type="checkbox" name="hazard" value="standing_water">
-          <span>Containers with standing water</span>
-        </label>
-        <label class="box-check">
-          <input type="checkbox" name="hazard" value="clogged_drain">
-          <span>Clogged gutter or drain</span>
-        </label>
-        <label class="box-check">
-          <input type="checkbox" name="hazard" value="tires_cans">
-          <span>Old tires, pots or cans</span>
-        </label>
-        <label class="box-check">
-          <input type="checkbox" name="hazard" value="indoor_bites">
-          <span>Mosquito bites inside the house</span>
-        </label>
+        <label class="box-check"><input type="checkbox" name="standing_water"><span data-i18n="report.o1">Containers with standing water</span></label>
+        <label class="box-check"><input type="checkbox" name="clogged_drain"><span data-i18n="report.o2">Clogged gutter or drain</span></label>
+        <label class="box-check"><input type="checkbox" name="tires_cans"><span data-i18n="report.o3">Old tires, pots or cans</span></label>
+        <label class="box-check"><input type="checkbox" name="indoor_bites"><span data-i18n="report.o4">Mosquito bites inside the house</span></label>
 
-        <div style="margin-top: 14px; display: flex; flex-direction: column; align-items: center; gap: 6px;">
-          <button type="submit" class="btn-primary-pill">Submit report</button>
-          <button type="button" class="btn-text-link" data-go="screen-home">Skip for now</button>
-          <p class="muted-text" style="text-align: center; font-size: 0.74rem;">
-            Stored only as barangay totals. No photos or addresses.
-          </p>
+        <div class="form-end">
+          <button type="submit" class="btn-primary-pill" data-i18n="report.submit">Submit report</button>
+          <button type="button" class="btn-text-link" data-go="screen-home" data-i18n="report.skip">Skip for now</button>
+          <p class="muted-text center-text" data-i18n="report.note">Stored only as barangay totals. No photos or addresses.</p>
         </div>
       </form>
     </section>
 
     <!-- =========================================================
-         R6 · CHECK: SYMPTOM CHECKER (All unchecked, no Private pill)
+         R6 · CHECK: SYMPTOM CHECKER
          ========================================================= -->
     <section class="screen" id="screen-check">
-      <h1 class="section-title">How are you feeling?</h1>
+      <h1 class="section-title" data-i18n="check.title">How are you feeling?</h1>
 
       <div>
-        <h2 class="card-title" style="margin-bottom: 8px;">Symptoms</h2>
+        <h2 class="card-title" style="margin-bottom: 8px;" data-i18n="check.symptoms">Symptoms</h2>
         <div class="check-list">
-          <label class="box-check">
-            <input type="checkbox" class="sym-check" value="headache">
-            <span>Headache</span>
-          </label>
-          <label class="box-check">
-            <input type="checkbox" class="sym-check" value="fever">
-            <span>Sudden high fever (2&ndash;7 days)</span>
-          </label>
-          <label class="box-check">
-            <input type="checkbox" class="sym-check" value="joint_pain">
-            <span>Severe joint, muscle, or eye pain</span>
-          </label>
-          <label class="box-check">
-            <input type="checkbox" class="sym-check" value="rash">
-            <span>Skin rash or nausea</span>
-          </label>
+          <label class="box-check"><input type="checkbox" class="sym-check" value="headache"><span data-i18n="check.s1">Headache</span></label>
+          <label class="box-check"><input type="checkbox" class="sym-check" value="fever"><span data-i18n="check.s2">Sudden high fever (2–7 days)</span></label>
+          <label class="box-check"><input type="checkbox" class="sym-check" value="joint_pain"><span data-i18n="check.s3">Severe joint, muscle, or eye pain</span></label>
+          <label class="box-check"><input type="checkbox" class="sym-check" value="rash"><span data-i18n="check.s4">Skin rash or nausea</span></label>
         </div>
       </div>
 
       <div>
-        <h2 class="card-title" style="margin-bottom: 8px;">Warning signs &middot; Tick any you have</h2>
+        <h2 class="card-title" style="margin-bottom: 8px;" data-i18n="check.warnings">Warning signs · Tick any you have</h2>
         <div class="check-list">
-          <label class="box-check">
-            <input type="checkbox" class="warn-check" value="belly_pain">
-            <span>Severe belly pain</span>
-          </label>
-          <label class="box-check">
-            <input type="checkbox" class="warn-check" value="vomiting">
-            <span>Persistent vomiting (3+ times in 24h)</span>
-          </label>
-          <label class="box-check">
-            <input type="checkbox" class="warn-check" value="bleeding">
-            <span>Bleeding gums or nose</span>
-          </label>
+          <label class="box-check"><input type="checkbox" class="warn-check" value="belly_pain"><span data-i18n="check.w1">Severe belly pain</span></label>
+          <label class="box-check"><input type="checkbox" class="warn-check" value="vomiting"><span data-i18n="check.w2">Persistent vomiting (3+ times in 24h)</span></label>
+          <label class="box-check"><input type="checkbox" class="warn-check" value="bleeding"><span data-i18n="check.w3">Bleeding gums or nose</span></label>
         </div>
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
-          <span class="muted-text">Key dengue warning signs</span>
-          <button type="button" class="btn-text-link" id="clear-symptoms-btn" style="padding: 2px 4px;">Clear all</button>
+        <div class="check-foot">
+          <span class="muted-text" data-i18n="check.key">Key dengue warning signs</span>
+          <button type="button" class="btn-text-link" id="clear-symptoms-btn" data-i18n="check.clear">Clear all</button>
         </div>
       </div>
 
-      <button type="button" class="btn-primary-pill" id="evaluate-symptoms-btn">See what to do</button>
+      <button type="button" class="btn-primary-pill" id="evaluate-symptoms-btn" data-i18n="check.see">See what to do</button>
 
-      <!-- Result Card (Revealed after tapping "See what to do") -->
-      <div class="result-card" id="symptom-result-card">
+      <div class="result-card" id="symptom-result-card" role="status">
         <h2 class="card-title" id="result-heading"></h2>
         <p class="muted-text" style="color: var(--res-text); margin-top: 4px;" id="result-body"></p>
       </div>
 
-      <!-- Local Care Finder -->
       <a class="care-link-card" href="https://maps.google.com/?q=Daraga+Rural+Health+Unit+Albay" target="_blank" rel="noopener">
         <div>
-          <div class="card-title" id="care-title">Find care in Daraga</div>
-          <p class="muted-text" id="care-facilities">Daraga RHU &middot; Bicol Regional Hospital &middot; Open map</p>
+          <div class="card-title" data-i18n="care.title">Find care in Daraga</div>
+          <p class="muted-text" data-i18n="care.facilities">Daraga RHU · Bicol Regional Hospital · Open map</p>
         </div>
-        <span style="color: var(--ae-teal-dark); font-weight: 800; font-size: 1.1rem;">&rsaquo;</span>
+        <span style="color: var(--ae-teal-dark); font-weight: 800; font-size: 1.1rem;" aria-hidden="true">&rsaquo;</span>
       </a>
     </section>
 
@@ -337,332 +491,74 @@
          ========================================================= -->
     <section class="screen" id="screen-learn">
       <div class="sub-tabs" role="tablist">
-        <button type="button" class="sub-tab active" data-learn="learn-5s">5S</button>
-        <button type="button" class="sub-tab" data-learn="learn-symptoms">Symptoms</button>
-        <button type="button" class="sub-tab" data-learn="learn-mosquito">Mosquito</button>
-        <button type="button" class="sub-tab" data-learn="learn-myths">Myths &amp; FAQ</button>
-        <button type="button" class="sub-tab" data-learn="learn-situation">Situation</button>
+        <button type="button" class="sub-tab active" data-learn="learn-5s" data-i18n="learn.t5s">5S</button>
+        <button type="button" class="sub-tab" data-learn="learn-symptoms" data-i18n="learn.tSymptoms">Symptoms</button>
+        <button type="button" class="sub-tab" data-learn="learn-mosquito" data-i18n="learn.tMosquito">Mosquito</button>
+        <button type="button" class="sub-tab" data-learn="learn-myths" data-i18n="learn.tMyths">Myths &amp; FAQ</button>
+        <button type="button" class="sub-tab" data-learn="learn-situation" data-i18n="learn.tSituation">Situation</button>
       </div>
 
       <div class="learn-banner">
-        <div class="learn-banner-icon">
-          <img src="/shared/logo.svg" alt="AeDispatch">
-        </div>
+        <div class="learn-banner-icon"><img src="/shared/logo.svg" alt=""></div>
         <div>
-          <div class="card-title">DOH Dengue Prevention</div>
-          <p class="muted-text">Evidence-based guidance for Albay households</p>
+          <div class="card-title" data-i18n="learn.banner.t">DOH Dengue Prevention</div>
+          <p class="muted-text" data-i18n="learn.banner.d">Evidence-based guidance for Albay households</p>
         </div>
       </div>
 
-      <h1 class="section-title">Know dengue. Protect your home.</h1>
+      <h1 class="section-title" data-i18n="learn.title">Know dengue. Protect your home.</h1>
 
-      <!-- Sub-tab 1: 5S -->
       <div class="learn-panel active" id="learn-5s">
-        <div class="card">
-          <div class="card-title">Search and destroy</div>
-          <p class="muted-text">Empty, scrub and cover water containers.</p>
-        </div>
-        <div class="card">
-          <div class="card-title">Self-protection</div>
-          <p class="muted-text">Use insect repellent, wear long sleeves, and screen windows.</p>
-        </div>
-        <div class="card">
-          <div class="card-title">Seek early consultation</div>
-          <p class="muted-text">Consult your RHU or hospital if fever lasts more than 2 days.</p>
-        </div>
-        <div class="card">
-          <div class="card-title">Support fogging where needed</div>
-          <p class="muted-text">Cooperate during targeted BHW larviciding and fogging operations.</p>
-        </div>
-        <div class="card">
-          <div class="card-title">Sustain hydration</div>
-          <p class="muted-text">Drink water, oral rehydration salts (ORS), or clear broths regularly.</p>
-        </div>
+        <div class="card"><div class="card-title" data-i18n="learn.5s.1.t"></div><p class="muted-text" data-i18n="learn.5s.1.d"></p></div>
+        <div class="card"><div class="card-title" data-i18n="learn.5s.2.t"></div><p class="muted-text" data-i18n="learn.5s.2.d"></p></div>
+        <div class="card"><div class="card-title" data-i18n="learn.5s.3.t"></div><p class="muted-text" data-i18n="learn.5s.3.d"></p></div>
+        <div class="card"><div class="card-title" data-i18n="learn.5s.4.t"></div><p class="muted-text" data-i18n="learn.5s.4.d"></p></div>
+        <div class="card"><div class="card-title" data-i18n="learn.5s.5.t"></div><p class="muted-text" data-i18n="learn.5s.5.d"></p></div>
       </div>
 
-      <!-- Sub-tab 2: Symptoms -->
       <div class="learn-panel" id="learn-symptoms">
-        <div class="card">
-          <div class="card-title">Febrile Phase (Days 1&ndash;3)</div>
-          <p class="muted-text">Sudden high fever, severe headache, pain behind the eyes, and muscle/joint aches.</p>
-        </div>
-        <div class="card">
-          <div class="card-title">Critical Phase (Days 3&ndash;7)</div>
-          <p class="muted-text">Fever may drop while warning signs appear: severe abdominal pain, persistent vomiting, or mucosal bleeding.</p>
-        </div>
+        <div class="card"><div class="card-title" data-i18n="learn.sym.1.t"></div><p class="muted-text" data-i18n="learn.sym.1.d"></p></div>
+        <div class="card"><div class="card-title" data-i18n="learn.sym.2.t"></div><p class="muted-text" data-i18n="learn.sym.2.d"></p></div>
       </div>
 
-      <!-- Sub-tab 3: Mosquito -->
       <div class="learn-panel" id="learn-mosquito">
-        <div class="card">
-          <div class="card-title">Aedes aegypti habits</div>
-          <p class="muted-text">Bites mostly during early morning and late afternoon. Breeds in clean, stagnant household water.</p>
-        </div>
-        <div class="card">
-          <div class="card-title">7-day egg-to-adult cycle</div>
-          <p class="muted-text">Eggs laid on damp container walls hatch when rain refills them and become biting adults within a week.</p>
-        </div>
+        <div class="card"><div class="card-title" data-i18n="learn.mos.1.t"></div><p class="muted-text" data-i18n="learn.mos.1.d"></p></div>
+        <div class="card"><div class="card-title" data-i18n="learn.mos.2.t"></div><p class="muted-text" data-i18n="learn.mos.2.d"></p></div>
       </div>
 
-      <!-- Sub-tab 4: Myths & FAQ -->
       <div class="learn-panel" id="learn-myths">
-        <div class="card">
-          <div class="card-title">Myth: Dengue mosquitoes only breed in dirty canals</div>
-          <p class="muted-text">Fact: Aedes mosquitoes prefer clean, still water in drums, flower vases, dish racks, and roof gutters.</p>
-        </div>
-        <div class="card">
-          <div class="card-title">FAQ: Which pain reliever is safe?</div>
-          <p class="muted-text">Use Paracetamol only as prescribed. Avoid aspirin, ibuprofen, and mefenamic acid as they increase bleeding risk.</p>
-        </div>
+        <div class="card"><div class="card-title" data-i18n="learn.myth.1.t"></div><p class="muted-text" data-i18n="learn.myth.1.d"></p></div>
+        <div class="card"><div class="card-title" data-i18n="learn.myth.2.t"></div><p class="muted-text" data-i18n="learn.myth.2.d"></p></div>
       </div>
 
-      <!-- Sub-tab 5: Situation -->
       <div class="learn-panel" id="learn-situation">
-        <div class="card">
-          <div class="card-title">Albay Early-Warning Surveillance</div>
-          <p class="muted-text">AeDispatch combines rainfall, container indices, and anonymous household reports so BHWs can act before outbreaks spread.</p>
-        </div>
+        <div class="card"><div class="card-title" data-i18n="learn.sit.1.t"></div><p class="muted-text" data-i18n="learn.sit.1.d"></p></div>
       </div>
 
-      <button type="button" class="btn-primary-pill" id="learn-to-check-btn">
-        Check my symptoms now
-      </button>
+      <button type="button" class="btn-primary-pill" id="learn-to-check-btn" data-i18n="learn.cta">Check my symptoms now</button>
     </section>
 
-    <!-- Toast Feedback -->
-    <div class="toast" id="app-toast"></div>
+    <!-- Toast feedback (announced to screen readers) -->
+    <div class="toast" id="app-toast" role="status" aria-live="polite"></div>
 
-    <!-- =========================================================
-         BOTTOM NAVIGATION (Home · Check · Learn)
-         ========================================================= -->
-    <nav class="bottom-nav" aria-label="Primary">
+    <!-- Bottom navigation: Home · Check · Learn -->
+    <nav class="bottom-nav" id="bottom-nav" data-i18n-aria="nav.aria" hidden>
       <button type="button" class="nav-tab active" data-nav="screen-home">
-        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
-        <span>Home</span>
+        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+        <span data-i18n="nav.home">Home</span>
       </button>
       <button type="button" class="nav-tab" data-nav="screen-check">
-        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
-        <span>Check</span>
+        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
+        <span data-i18n="nav.check">Check</span>
       </button>
       <button type="button" class="nav-tab" data-nav="screen-learn">
-        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
-        <span>Learn</span>
+        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
+        <span data-i18n="nav.learn">Learn</span>
       </button>
     </nav>
 
   </div>
 
-  <script>
-    const LOCATION_CONFIG = {
-      sagpon: {
-        name: "Brgy. Sagpon, Daraga",
-        level: "Elevated risk",
-        pillClass: "pill-elevated",
-        heroClass: "hero-card",
-        segClass: "active-elev",
-        step: 3,
-        headline: "Conditions favor mosquito hatching through Sunday.",
-        peak: "Peaks Fri",
-        bars: [36, 44, 54, 42, 34, 26, 24],
-        peakIdx: 2,
-        careTitle: "Find care in Daraga",
-        careText: "Daraga RHU · Bicol Regional Hospital · Open map"
-      },
-      penafrancia: {
-        name: "Brgy. Peñafrancia, Daraga",
-        level: "Elevated risk",
-        pillClass: "pill-elevated",
-        heroClass: "hero-card",
-        segClass: "active-elev",
-        step: 3,
-        headline: "Warm rain forecast increases container breeding risk.",
-        peak: "Peaks Sat",
-        bars: [30, 38, 46, 56, 44, 30, 26],
-        peakIdx: 3,
-        careTitle: "Find care in Daraga",
-        careText: "Daraga RHU · Bicol Regional Hospital · Open map"
-      },
-      bascaran: {
-        name: "Brgy. Bascaran, Daraga",
-        level: "High risk",
-        pillClass: "pill-high",
-        heroClass: "hero-card risk-state-high",
-        segClass: "active-high",
-        step: 4,
-        headline: "High mosquito breeding activity detected in nearby puroks.",
-        peak: "Peaks Thu",
-        bars: [48, 60, 54, 46, 40, 34, 30],
-        peakIdx: 1,
-        careTitle: "Find care in Daraga",
-        careText: "Daraga RHU · Bicol Regional Hospital · Open map"
-      },
-      "old-albay": {
-        name: "Brgy. Old Albay, Legazpi",
-        level: "Moderate risk",
-        pillClass: "pill-moderate",
-        heroClass: "hero-card risk-state-low",
-        segClass: "active-mod",
-        step: 2,
-        headline: "Keep outdoor containers covered and empty after rain.",
-        peak: "Peaks Fri",
-        bars: [22, 28, 38, 30, 24, 20, 18],
-        peakIdx: 2,
-        careTitle: "Find care in Legazpi",
-        careText: "Legazpi City Health Office · Bicol Regional Hospital · Open map"
-      }
-    };
-
-    function showToast(msg) {
-      const toast = document.getElementById("app-toast");
-      toast.textContent = msg;
-      toast.style.display = "block";
-      clearTimeout(toast._timer);
-      toast._timer = setTimeout(() => { toast.style.display = "none"; }, 2800);
-    }
-
-    function showScreen(screenId) {
-      document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
-      document.getElementById(screenId).classList.add("active");
-
-      // Show location topbar only on primary Home tab
-      document.getElementById("main-topbar").style.display = screenId === "screen-home" ? "flex" : "none";
-
-      // Sync bottom nav active state
-      const navMap = {
-        "screen-home": "screen-home",
-        "screen-warning": "screen-home",
-        "screen-alerts": "screen-home",
-        "screen-report": "screen-home",
-        "screen-check": "screen-check",
-        "screen-learn": "screen-learn"
-      };
-      const activeNav = navMap[screenId] || "screen-home";
-      document.querySelectorAll(".nav-tab").forEach(btn => {
-        btn.classList.toggle("active", btn.dataset.nav === activeNav);
-      });
-
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-      // Barangay Switcher
-      document.getElementById("barangay-select").addEventListener("change", (e) => {
-        const cfg = LOCATION_CONFIG[e.target.value];
-        const hero = document.getElementById("home-hero-card");
-        hero.className = `card ${cfg.heroClass}`;
-
-        const pill = document.getElementById("home-risk-pill");
-        pill.textContent = cfg.level;
-        pill.className = `status-pill ${cfg.pillClass}`;
-        document.getElementById("home-headline").textContent = cfg.headline;
-        document.getElementById("peak-badge").textContent = cfg.peak;
-        document.getElementById("alerts-barangay-label").textContent = cfg.name;
-        document.getElementById("care-title").textContent = cfg.careTitle;
-        document.getElementById("care-facilities").textContent = cfg.careText;
-
-        const segs = document.querySelectorAll("#meter-track .meter-seg");
-        const labels = document.querySelectorAll("#meter-labels span");
-        segs.forEach((seg, idx) => {
-          seg.className = idx === cfg.step - 1 ? `meter-seg ${cfg.segClass}` : "meter-seg";
-        });
-        labels.forEach((lbl, idx) => lbl.classList.toggle("active", idx === cfg.step - 1));
-
-        const fills = document.querySelectorAll("#outlook-bars .bar-fill");
-        fills.forEach((bar, idx) => {
-          bar.style.height = `${cfg.bars[idx]}px`;
-          bar.classList.toggle("peak", idx === cfg.peakIdx);
-        });
-      });
-
-      // Bottom Nav Tabs
-      document.querySelectorAll(".nav-tab").forEach(tab => {
-        tab.addEventListener("click", () => showScreen(tab.dataset.nav));
-      });
-
-      // Sub-navigation buttons (R2, R3, R5)
-      document.getElementById("open-warning-btn").addEventListener("click", () => showScreen("screen-warning"));
-      document.getElementById("open-alerts-btn").addEventListener("click", () => showScreen("screen-alerts"));
-      document.querySelectorAll("[data-go]").forEach(btn => {
-        btn.addEventListener("click", () => showScreen(btn.dataset.go));
-      });
-
-      // R1 Mosquito Pulse -> Reset R5 checkboxes & open Household Report
-      document.querySelectorAll("[data-pulse]").forEach(btn => {
-        btn.addEventListener("click", () => {
-          document.querySelectorAll("[data-pulse]").forEach(b => b.classList.remove("selected"));
-          btn.classList.add("selected");
-          document.getElementById("household-report-form").reset();
-          showScreen("screen-report");
-        });
-      });
-
-      document.getElementById("skip-pulse-btn").addEventListener("click", () => {
-        showToast("Daily check skipped");
-      });
-
-      // R2 Copy Tips
-      document.getElementById("copy-tips-btn").addEventListener("click", async () => {
-        const text = "AeDispatch Dengue Prevention:\n1. Empty standing water\n2. Cover water drums and pails\n3. Clear gutters and drains\n4. Protect yourself throughout the day";
-        try {
-          await navigator.clipboard.writeText(text);
-          showToast("Prevention tips copied");
-        } catch {
-          showToast("Tips ready to share");
-        }
-      });
-
-      // R5 Household Report Submit
-      document.getElementById("household-report-form").addEventListener("submit", (e) => {
-        e.preventDefault();
-        e.target.reset();
-        showToast("Anonymous barangay report submitted");
-        showScreen("screen-home");
-      });
-
-      // R6 Symptom Checker Evaluation
-      document.getElementById("clear-symptoms-btn").addEventListener("click", () => {
-        document.querySelectorAll(".sym-check, .warn-check").forEach(cb => { cb.checked = false; });
-        document.getElementById("symptom-result-card").style.display = "none";
-      });
-
-      document.getElementById("evaluate-symptoms-btn").addEventListener("click", () => {
-        const warns = document.querySelectorAll(".warn-check:checked").length;
-        const syms = document.querySelectorAll(".sym-check:checked").length;
-        const card = document.getElementById("symptom-result-card");
-        const heading = document.getElementById("result-heading");
-        const body = document.getElementById("result-body");
-
-        card.style.display = "block";
-
-        if (warns > 0) {
-          card.className = "result-card result-red";
-          heading.textContent = "Result: Seek urgent medical care now";
-          body.textContent = "You selected a dengue warning sign. Go to the nearest Rural Health Unit or hospital emergency room immediately.";
-        } else if (syms > 0) {
-          card.className = "result-card result-amber";
-          heading.textContent = "Result: See a doctor today";
-          body.textContent = "Within 24 hours. Drink fluids. Do not take aspirin or ibuprofen. Watch for warning signs (critical phase often day 3–7).";
-        } else {
-          card.className = "result-card";
-          heading.textContent = "Result: No symptoms selected";
-          body.textContent = "Continue daily 5S prevention around your home and monitor for sudden fever.";
-        }
-      });
-
-      // R7 Learn Sub-tabs & CTA
-      document.querySelectorAll(".sub-tab").forEach(tab => {
-        tab.addEventListener("click", () => {
-          document.querySelectorAll(".sub-tab").forEach(t => t.classList.remove("active"));
-          document.querySelectorAll(".learn-panel").forEach(p => p.classList.remove("active"));
-          tab.classList.add("active");
-          document.getElementById(tab.dataset.learn).classList.add("active");
-        });
-      });
-
-      document.getElementById("learn-to-check-btn").addEventListener("click", () => {
-        showScreen("screen-check");
-      });
-    });
-  </script>
+  <script type="module" src="/resident/app.js"></script>
 </body>
 </html>
