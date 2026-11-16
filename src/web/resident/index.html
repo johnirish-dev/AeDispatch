@@ -2,81 +2,563 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>AeDispatch - Resident</title>
-  <link rel="stylesheet" href="../shared/tokens.css">
-  <link rel="stylesheet" href="../shared/base.css">
-  <link rel="stylesheet" href="../shared/components.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AeDispatch — Resident Portal</title>
+  <link rel="icon" type="image/svg+xml" href="/shared/favicon.svg">
+  <link rel="stylesheet" href="/shared/tokens.css">
+  <link rel="stylesheet" href="/shared/base.css">
+  <link rel="stylesheet" href="/shared/components.css">
+  <link rel="stylesheet" href="/resident/resident.css">
 </head>
-<body>
+<body class="no-nav">
+  <div class="app-shell">
 
-<div class="app-container">
-  
-  <!-- Header -->
-  <header style="display: flex; justify-content: space-between; align-items: center; padding: 16px;">
-    <div>
-      <span style="font-size: 12px; color: var(--muted);">Your location</span>
-      <select style="display: block; border: none; background: transparent; font-weight: 600; font-size: 16px; outline: none; margin-left: -4px;">
-        <option>Peñafrancia</option>
-        <option>Tagas</option>
-      </select>
-    </div>
-    <button aria-label="Alerts" style="background: none; border: none; cursor: pointer; position: relative;">
-      <!-- Inline SVG for Bell -->
-      <svg width="24" height="24" fill="none" stroke="var(--ink)" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
-      <span style="position: absolute; top: 0; right: 0; width: 8px; height: 8px; background: var(--error); border-radius: 50%;"></span>
-    </button>
-  </header>
-
-  <main>
-    <!-- Hero Risk Card -->
-    <section class="card" style="background-color: var(--accent-tint); border-color: var(--accent);">
-      <div class="badge elevated" style="margin-bottom: 12px;">Elevated risk</div>
-      <h1 style="margin: 0 0 16px 0; font-size: 22px; line-height: 1.2;">Conditions favor mosquito hatching through Sunday.</h1>
-      
-      <!-- 4-step risk bar -->
-      <div style="display: flex; gap: 4px; margin-bottom: 16px;">
-        <div style="height: 6px; flex: 1; background: var(--low-fill); border-radius: 4px;"></div>
-        <div style="height: 6px; flex: 1; background: var(--mod-fill); border-radius: 4px;"></div>
-        <div style="height: 6px; flex: 1; background: var(--elev-fill); border-radius: 4px;"></div>
-        <div style="height: 6px; flex: 1; background: var(--line); border-radius: 4px;"></div>
+    <!-- Top bar: shown on Home only -->
+    <header class="topbar" id="main-topbar" hidden>
+      <div class="location-wrap">
+        <div class="brand-mark">
+          <img src="/shared/logo.svg" alt="">
+        </div>
+        <div class="location-meta">
+          <span class="location-label" data-i18n="home.location">Your location</span>
+          <select id="barangay-select" class="location-select" data-i18n-aria="home.selectAria"></select>
+        </div>
       </div>
-      
-      <button class="btn-link">Why and what to do ›</button>
+
+      <div class="topbar-actions">
+        <div class="lang-toggle" role="group" data-i18n-aria="lang.aria">
+          <button type="button" data-lang="en" aria-pressed="true">EN</button>
+          <button type="button" data-lang="fil" aria-pressed="false">FIL</button>
+        </div>
+        <button type="button" class="alert-icon-btn" id="open-alerts-btn" data-i18n-aria="home.alertsAria">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+          </svg>
+          <span class="alert-dot" id="alert-dot" hidden></span>
+        </button>
+      </div>
+    </header>
+
+    <!-- =========================================================
+         ONBOARDING 1 · SPLASH
+         ========================================================= -->
+    <section class="screen onboarding center-screen" id="screen-splash">
+      <img class="splash-logo" src="/shared/logo.svg" alt="AeDispatch">
+      <h1 class="splash-name" data-i18n="app.name">AeDispatch</h1>
+      <p class="splash-tagline" data-i18n="splash.tagline">Dengue alerts for your barangay</p>
+      <p class="splash-footer muted-text" data-i18n="splash.footer">Daraga Municipal Health Office</p>
     </section>
 
-    <!-- Daily Question Card -->
-    <section class="card">
-      <h2 style="font-size: 16px; margin-top: 0;">Daily Check-in</h2>
-      <p style="color: var(--muted); font-size: 14px; margin-bottom: 16px;">Have you noticed more daytime mosquitoes than usual?</p>
-      <div style="display: flex; gap: 8px; margin-bottom: 12px;">
-        <button class="btn-primary" id="btn-yes">Yes</button>
-        <button class="btn-secondary" id="btn-no">No</button>
+    <!-- =========================================================
+         ONBOARDING 2 · THREE INTRO SLIDES
+         ========================================================= -->
+    <section class="screen onboarding" id="screen-intro">
+      <div class="onb-top">
+        <div class="lang-toggle" role="group" data-i18n-aria="lang.aria">
+          <button type="button" data-lang="en" aria-pressed="true">EN</button>
+          <button type="button" data-lang="fil" aria-pressed="false">FIL</button>
+        </div>
+        <button type="button" class="btn-text-link" id="intro-skip" data-i18n="intro.skip">Skip</button>
       </div>
-      <div style="text-align: center;">
-        <button class="btn-link" style="font-size: 12px; color: var(--muted);">Skip for now</button>
+
+      <div class="slide-body">
+        <div class="orb orb-amber" id="intro-orb" aria-hidden="true">
+          <span class="orb-core">
+            <svg id="intro-icon-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+            <svg id="intro-icon-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" hidden><polyline points="20 6 9 17 4 12"></polyline></svg>
+            <svg id="intro-icon-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" hidden><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><polyline points="9 12 11 14 15 10"></polyline></svg>
+          </span>
+        </div>
+        <h1 class="onb-title" id="intro-title"></h1>
+        <p class="onb-body" id="intro-body"></p>
+      </div>
+
+      <div class="onb-bottom">
+        <div class="dots" id="intro-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+        <button type="button" class="btn-primary-pill" id="intro-next"></button>
       </div>
     </section>
-  </main>
 
-  <!-- Bottom Tabs -->
-  <nav class="bottom-nav">
-    <a href="#" class="nav-item active">
-      <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
-      Home
-    </a>
-    <a href="check.html" class="nav-item">
-      <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
-      Check
-    </a>
-    <a href="learn.html" class="nav-item">
-      <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg>
-      Learn
-    </a>
-  </nav>
+    <!-- =========================================================
+         ONBOARDING 3 · WHERE DO YOU LIVE?
+         ========================================================= -->
+    <section class="screen onboarding" id="screen-barangay">
+      <div class="onb-top">
+        <button type="button" class="back-btn" id="bgy-back">&lsaquo; <span data-i18n="bgy.back">Back</span></button>
+        <div class="lang-toggle" role="group" data-i18n-aria="lang.aria">
+          <button type="button" data-lang="en" aria-pressed="true">EN</button>
+          <button type="button" data-lang="fil" aria-pressed="false">FIL</button>
+        </div>
+      </div>
 
-</div>
+      <div>
+        <h1 class="section-title" data-i18n="bgy.title">Where do you live?</h1>
+        <p class="muted-text" style="margin-top: 6px;" data-i18n="bgy.sub">We'll show dengue alerts for your barangay.</p>
+      </div>
 
-<script type="module" src="app.js"></script>
+      <label class="search-field">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <input type="search" id="bgy-search" autocomplete="off" data-i18n-placeholder="bgy.search" data-i18n-aria="bgy.search">
+      </label>
+
+      <div class="bgy-list" id="bgy-list" role="radiogroup" data-i18n-aria="bgy.title"></div>
+      <p class="muted-text" id="bgy-nomatch" role="status" hidden></p>
+
+      <div class="notice-card" id="bgy-notlisted" role="status" hidden>
+        <h2 class="card-title" data-i18n="bgy.notListedTitle">Your barangay isn't in the system yet</h2>
+        <p class="muted-text" style="color: var(--res-text);" data-i18n="bgy.notListedBody"></p>
+      </div>
+
+      <div class="onb-actions">
+        <button type="button" class="btn-primary-pill" id="bgy-continue" disabled data-i18n="bgy.continue">Continue</button>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         ONBOARDING 4 · GET ALERTS
+         ========================================================= -->
+    <section class="screen onboarding" id="screen-alertsopt">
+      <div class="onb-top">
+        <button type="button" class="back-btn" id="alertsopt-back">&lsaquo; <span data-i18n="bgy.back">Back</span></button>
+      </div>
+
+      <div class="slide-body">
+        <div class="orb orb-amber" aria-hidden="true">
+          <span class="orb-core">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+          </span>
+        </div>
+        <h1 class="onb-title" data-i18n="alertsopt.title">Get alerts on your phone</h1>
+        <p class="onb-body" id="alertsopt-body"></p>
+        <div class="sample-notification">
+          <img src="/shared/logo.svg" alt="">
+          <div>
+            <div class="sample-top"><strong data-i18n="app.name">AeDispatch</strong><span class="muted-text" data-i18n="alertsopt.now">now</span></div>
+            <p class="muted-text" style="color: var(--res-text);" id="alertsopt-sample"></p>
+          </div>
+        </div>
+        <p class="muted-text" data-i18n="alertsopt.note">Prototype: alerts appear inside this app only.</p>
+      </div>
+
+      <div class="onb-actions">
+        <button type="button" class="btn-primary-pill" id="alertsopt-on" data-i18n="alertsopt.on">Turn on alerts</button>
+        <button type="button" class="btn-text-link" id="alertsopt-off" data-i18n="alertsopt.off">Not now</button>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         DAILY CHECK-IN (full screen, once a day, can be skipped)
+         ========================================================= -->
+    <section class="screen onboarding" id="screen-checkin">
+      <div class="onb-top">
+        <span></span>
+        <button type="button" class="btn-text-link" id="checkin-skip" data-i18n="checkin.skip">Skip</button>
+      </div>
+
+      <div class="slide-body" id="checkin-ask">
+        <div class="orb orb-teal" aria-hidden="true">
+          <span class="orb-core">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+          </span>
+        </div>
+        <span class="tag-pill" data-i18n="checkin.tag">DAILY CHECK-IN</span>
+        <h1 class="onb-title" data-i18n="checkin.title">Have you noticed more daytime mosquitoes than usual?</h1>
+        <p class="onb-body" data-i18n="checkin.sub">One tap. It helps your health team decide where to check first.</p>
+      </div>
+
+      <div class="slide-body" id="checkin-thanks" hidden>
+        <div class="orb orb-teal" aria-hidden="true">
+          <span class="orb-core">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          </span>
+        </div>
+        <h1 class="onb-title" data-i18n="checkin.thanks">Thank you!</h1>
+        <p class="onb-body" data-i18n="checkin.thanksSub">Your answer helps your health team.</p>
+      </div>
+
+      <div class="onb-actions" id="checkin-ask-actions">
+        <button type="button" class="btn-primary-pill" data-checkin="yes" data-i18n="checkin.yes">Yes, more than usual</button>
+        <button type="button" class="btn-secondary-pill" data-checkin="no" data-i18n="checkin.no">No, about the same</button>
+        <p class="muted-text center-text" data-i18n="checkin.note">Anonymous. Counted by barangay only.</p>
+      </div>
+
+      <div class="onb-actions" id="checkin-thanks-actions" hidden>
+        <button type="button" class="btn-primary-pill" id="checkin-report" data-i18n="checkin.report">Report something at home (optional)</button>
+        <button type="button" class="btn-text-link" id="checkin-done" data-i18n="checkin.done">Done</button>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         R1 · HOME
+         ========================================================= -->
+    <section class="screen" id="screen-home">
+      <div id="home-listed" class="stack">
+        <div class="card hero-card" id="home-hero-card">
+          <span class="status-pill pill-elevated" id="home-risk-pill"></span>
+          <h1 class="section-title" style="margin-top: 10px;" id="home-headline"></h1>
+
+          <div class="risk-meter">
+            <div class="meter-track" id="meter-track">
+              <div class="meter-seg"></div>
+              <div class="meter-seg"></div>
+              <div class="meter-seg"></div>
+              <div class="meter-seg"></div>
+            </div>
+            <div class="meter-labels" id="meter-labels">
+              <span data-i18n="level.low">Low</span>
+              <span data-i18n="level.moderate">Moderate</span>
+              <span data-i18n="level.elevated">Elevated</span>
+              <span data-i18n="level.high">High</span>
+            </div>
+          </div>
+
+          <button type="button" class="btn-outline-pill" id="open-warning-btn">
+            <span data-i18n="home.why">Why and what to do</span> &rsaquo;
+          </button>
+        </div>
+
+        <!-- 7-day breeding outlook -->
+        <div class="card">
+          <div class="card-header-row">
+            <div>
+              <h2 class="card-title" data-i18n="home.outlook">7-day breeding outlook</h2>
+              <p class="muted-text" data-i18n="home.outlookNote">Illustrative forecast · not live weather</p>
+            </div>
+            <span class="outline-pill" id="peak-badge"></span>
+          </div>
+          <div class="outlook-bars" id="outlook-bars" role="img"></div>
+        </div>
+
+        <!-- Daily question: no sign-in -->
+        <div class="card" id="daily-card">
+          <div id="daily-ask">
+            <h2 class="card-title" data-i18n="daily.question">Have you noticed more daytime mosquitoes than usual?</h2>
+            <div class="pulse-actions">
+              <button type="button" class="btn-outline-pill" data-pulse="yes" data-i18n="daily.yes">Yes</button>
+              <button type="button" class="btn-outline-pill" data-pulse="no" data-i18n="daily.no">No</button>
+              <button type="button" class="btn-text-link" id="skip-pulse-btn" data-i18n="daily.skip">Skip</button>
+            </div>
+          </div>
+          <div id="daily-thanks" hidden>
+            <h2 class="card-title" data-i18n="daily.thanksTitle">Thanks for today's check-in</h2>
+            <p class="muted-text" data-i18n="daily.thanksBody">Come back tomorrow. Your answer helps your health team.</p>
+          </div>
+        </div>
+
+        <!-- Do today -->
+        <div class="card">
+          <h2 class="card-title" style="margin-bottom: 10px;" data-i18n="home.doToday">Do today</h2>
+          <div class="check-list">
+            <label class="inline-check"><input type="checkbox"><span data-i18n="home.do1">Empty and scrub standing water</span></label>
+            <label class="inline-check"><input type="checkbox"><span data-i18n="home.do2">Cover water drums</span></label>
+            <label class="inline-check"><input type="checkbox"><span data-i18n="home.do3">Use daytime mosquito protection</span></label>
+          </div>
+        </div>
+
+        <!-- Optional report: this is the only thing that needs sign-in -->
+        <div class="card">
+          <h2 class="card-title" data-i18n="reportcard.title">Anything around your home?</h2>
+          <p class="muted-text" data-i18n="reportcard.body">Optional. You'll sign in with your mobile number to send a report.</p>
+          <button type="button" class="btn-outline-pill" id="open-report-btn" style="margin-top: 12px;" data-i18n="reportcard.btn">Report what you see</button>
+        </div>
+      </div>
+
+      <div id="home-nolisting" class="stack" hidden>
+        <div class="card notice-card">
+          <h1 class="section-title" data-i18n="home.noListingTitle">Your barangay isn't in the system yet</h1>
+          <p class="muted-text" style="margin-top: 8px;" data-i18n="home.noListingBody"></p>
+          <button type="button" class="btn-outline-pill" id="choose-barangay-btn" style="margin-top: 14px;" data-i18n="bgy.choose">Choose a barangay</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         R2 · EARLY WARNING DETAILS
+         ========================================================= -->
+    <section class="screen" id="screen-warning">
+      <div class="sub-header">
+        <button type="button" class="back-btn" data-go="screen-home">&lsaquo; <span data-i18n="warn.back">Early warning</span></button>
+      </div>
+
+      <div>
+        <p class="muted-text" style="margin-bottom: 4px;" id="warn-dates"></p>
+        <h1 class="section-title" data-i18n="warn.title">Mosquito-hatching conditions ahead</h1>
+      </div>
+
+      <div>
+        <h2 class="card-title" style="margin-bottom: 8px;" data-i18n="warn.why">Why you got this</h2>
+        <div class="two-col">
+          <div class="card stat-card-amber">
+            <span class="card-title" style="font-size: 0.86rem;" data-i18n="warn.temp">Temperature</span>
+            <div class="stat-value" data-i18n="warn.tempValue">28 to 31 °C</div>
+            <p class="muted-text" data-i18n="warn.tempNote">Ideal range for Aedes to breed and bite.</p>
+          </div>
+          <div class="card stat-card-teal">
+            <span class="card-title" style="font-size: 0.86rem;" data-i18n="warn.rain">Rain</span>
+            <div class="stat-value" data-i18n="warn.rainValue">4 of 7 days</div>
+            <p class="muted-text" data-i18n="warn.rainNote">Rain refills containers and triggers eggs to hatch.</p>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <h2 class="card-title" style="margin-bottom: 8px;" data-i18n="warn.do">What you can do now</h2>
+        <div class="check-list">
+          <div class="step-card">
+            <span class="step-badge">1</span>
+            <div>
+              <div class="card-title" style="font-size: 0.9rem;" data-i18n="warn.s1.t">Empty standing water</div>
+              <p class="muted-text" data-i18n="warn.s1.d">Tip out pails, plant saucers and vases.</p>
+            </div>
+          </div>
+          <div class="step-card">
+            <span class="step-badge">2</span>
+            <div><div class="card-title" style="font-size: 0.9rem;" data-i18n="warn.s2.t">Cover water drums and pails</div></div>
+          </div>
+          <div class="step-card">
+            <span class="step-badge">3</span>
+            <div><div class="card-title" style="font-size: 0.9rem;" data-i18n="warn.s3.t">Clear gutters and drains</div></div>
+          </div>
+          <div class="step-card">
+            <span class="step-badge">4</span>
+            <div><div class="card-title" style="font-size: 0.9rem;" data-i18n="warn.s4.t">Protect yourself throughout the day</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dual-actions">
+        <button type="button" class="btn-outline-pill" id="copy-tips-btn" data-i18n="warn.copy">Copy tips</button>
+        <button type="button" class="btn-primary-pill" data-go="screen-home" data-i18n="warn.got">Got it</button>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         R3 · ALERTS (and the demo SMS messages)
+         ========================================================= -->
+    <section class="screen" id="screen-alerts">
+      <div class="sub-header">
+        <button type="button" class="back-btn" data-go="screen-home">&lsaquo; <span data-i18n="alerts.back">Alerts</span></button>
+      </div>
+
+      <div>
+        <h1 class="section-title" data-i18n="alerts.title">Alerts</h1>
+        <p class="muted-text" id="alerts-barangay-label"></p>
+      </div>
+
+      <div class="card state-row">
+        <span class="card-title" id="alerts-state"></span>
+        <button type="button" class="btn-outline-pill" id="alerts-toggle"></button>
+      </div>
+
+      <div id="alerts-list" class="stack"></div>
+
+      <div>
+        <h2 class="card-title" style="margin-bottom: 8px;" data-i18n="alerts.messages">Messages</h2>
+        <div id="messages-list" class="stack"></div>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         R4 · SIGN IN (only to send a report)
+         ========================================================= -->
+    <section class="screen onboarding" id="screen-signin">
+      <div class="onb-top">
+        <button type="button" class="back-btn" data-go="screen-home">&lsaquo; <span data-i18n="signin.back">Back</span></button>
+      </div>
+
+      <div>
+        <div class="orb-small" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+        </div>
+        <h1 class="section-title" style="margin-top: 14px;" data-i18n="signin.title">Sign in to contribute</h1>
+        <p class="muted-text" style="margin-top: 6px;" data-i18n="signin.sub">Only needed when you send a report. No password.</p>
+      </div>
+
+      <form id="signin-form" novalidate class="stack">
+        <label class="field-label" for="phone-input" data-i18n="signin.mobile">Mobile number</label>
+        <div class="phone-field">
+          <span class="phone-prefix">+63</span>
+          <input id="phone-input" type="tel" inputmode="numeric" autocomplete="off" maxlength="10" placeholder="912 345 6789">
+        </div>
+        <p class="field-error" id="phone-error" role="alert" hidden></p>
+        <button type="submit" class="btn-primary-pill" data-i18n="signin.send">Send one-time PIN</button>
+      </form>
+
+      <p class="privacy-note" data-i18n="signin.privacy">Viewing alerts never needs sign-in. Your number is never shown to others.</p>
+    </section>
+
+    <section class="screen onboarding" id="screen-pin">
+      <div class="onb-top">
+        <button type="button" class="back-btn" id="pin-back">&lsaquo; <span data-i18n="signin.back">Back</span></button>
+      </div>
+
+      <div>
+        <h1 class="section-title" data-i18n="pin.title">Enter the 6-digit PIN</h1>
+        <p class="muted-text" style="margin-top: 6px;" id="pin-sub"></p>
+      </div>
+
+      <div class="pin-boxes" id="pin-boxes"></div>
+      <p class="field-error" id="pin-error" role="alert" hidden></p>
+
+      <div class="pin-meta">
+        <span class="muted-text" id="pin-resend-text"></span>
+        <span class="demo-pill" id="pin-demo"></span>
+      </div>
+      <button type="button" class="btn-text-link" id="pin-resend" hidden data-i18n="pin.resend">Resend PIN</button>
+      <button type="button" class="btn-text-link" id="pin-change" data-i18n="pin.change">Change number</button>
+
+      <div class="onb-actions">
+        <button type="button" class="btn-primary-pill" id="pin-verify" data-i18n="pin.verify">Verify</button>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         R5 · HOUSEHOLD REPORT (after sign-in)
+         ========================================================= -->
+    <section class="screen" id="screen-report">
+      <div class="sub-header">
+        <button type="button" class="back-btn" data-go="screen-home">&times; <span data-i18n="report.close">Close</span></button>
+        <span class="muted-text" style="font-weight: 700;" data-i18n="report.optional">Optional · 1 minute</span>
+      </div>
+
+      <div>
+        <h1 class="section-title" data-i18n="report.title">Anything around your home?</h1>
+        <p class="muted-text" style="margin-top: 4px;" data-i18n="report.sub">Tick everything you noticed. Leave blank if all clear.</p>
+      </div>
+
+      <form id="household-report-form" class="check-list">
+        <label class="box-check"><input type="checkbox" name="standing_water"><span data-i18n="report.o1">Containers with standing water</span></label>
+        <label class="box-check"><input type="checkbox" name="clogged_drain"><span data-i18n="report.o2">Clogged gutter or drain</span></label>
+        <label class="box-check"><input type="checkbox" name="tires_cans"><span data-i18n="report.o3">Old tires, pots or cans</span></label>
+        <label class="box-check"><input type="checkbox" name="indoor_bites"><span data-i18n="report.o4">Mosquito bites inside the house</span></label>
+
+        <div class="form-end">
+          <button type="submit" class="btn-primary-pill" data-i18n="report.submit">Submit report</button>
+          <button type="button" class="btn-text-link" data-go="screen-home" data-i18n="report.skip">Skip for now</button>
+          <p class="muted-text center-text" data-i18n="report.note">Stored only as barangay totals. No photos or addresses.</p>
+        </div>
+      </form>
+    </section>
+
+    <!-- =========================================================
+         R6 · CHECK: SYMPTOM CHECKER
+         ========================================================= -->
+    <section class="screen" id="screen-check">
+      <h1 class="section-title" data-i18n="check.title">How are you feeling?</h1>
+
+      <div>
+        <h2 class="card-title" style="margin-bottom: 8px;" data-i18n="check.symptoms">Symptoms</h2>
+        <div class="check-list">
+          <label class="box-check"><input type="checkbox" class="sym-check" value="headache"><span data-i18n="check.s1">Headache</span></label>
+          <label class="box-check"><input type="checkbox" class="sym-check" value="fever"><span data-i18n="check.s2">Sudden high fever (2–7 days)</span></label>
+          <label class="box-check"><input type="checkbox" class="sym-check" value="joint_pain"><span data-i18n="check.s3">Severe joint, muscle, or eye pain</span></label>
+          <label class="box-check"><input type="checkbox" class="sym-check" value="rash"><span data-i18n="check.s4">Skin rash or nausea</span></label>
+        </div>
+      </div>
+
+      <div>
+        <h2 class="card-title" style="margin-bottom: 8px;" data-i18n="check.warnings">Warning signs · Tick any you have</h2>
+        <div class="check-list">
+          <label class="box-check"><input type="checkbox" class="warn-check" value="belly_pain"><span data-i18n="check.w1">Severe belly pain</span></label>
+          <label class="box-check"><input type="checkbox" class="warn-check" value="vomiting"><span data-i18n="check.w2">Persistent vomiting (3+ times in 24h)</span></label>
+          <label class="box-check"><input type="checkbox" class="warn-check" value="bleeding"><span data-i18n="check.w3">Bleeding gums or nose</span></label>
+        </div>
+        <div class="check-foot">
+          <span class="muted-text" data-i18n="check.key">Key dengue warning signs</span>
+          <button type="button" class="btn-text-link" id="clear-symptoms-btn" data-i18n="check.clear">Clear all</button>
+        </div>
+      </div>
+
+      <button type="button" class="btn-primary-pill" id="evaluate-symptoms-btn" data-i18n="check.see">See what to do</button>
+
+      <div class="result-card" id="symptom-result-card" role="status">
+        <h2 class="card-title" id="result-heading"></h2>
+        <p class="muted-text" style="color: var(--res-text); margin-top: 4px;" id="result-body"></p>
+      </div>
+
+      <a class="care-link-card" href="https://maps.google.com/?q=Daraga+Rural+Health+Unit+Albay" target="_blank" rel="noopener">
+        <div>
+          <div class="card-title" data-i18n="care.title">Find care in Daraga</div>
+          <p class="muted-text" data-i18n="care.facilities">Daraga RHU · Bicol Regional Hospital · Open map</p>
+        </div>
+        <span style="color: var(--ae-teal-dark); font-weight: 800; font-size: 1.1rem;" aria-hidden="true">&rsaquo;</span>
+      </a>
+    </section>
+
+    <!-- =========================================================
+         R7 · LEARN
+         ========================================================= -->
+    <section class="screen" id="screen-learn">
+      <div class="sub-tabs" role="tablist">
+        <button type="button" class="sub-tab active" data-learn="learn-5s" data-i18n="learn.t5s">5S</button>
+        <button type="button" class="sub-tab" data-learn="learn-symptoms" data-i18n="learn.tSymptoms">Symptoms</button>
+        <button type="button" class="sub-tab" data-learn="learn-mosquito" data-i18n="learn.tMosquito">Mosquito</button>
+        <button type="button" class="sub-tab" data-learn="learn-myths" data-i18n="learn.tMyths">Myths &amp; FAQ</button>
+        <button type="button" class="sub-tab" data-learn="learn-situation" data-i18n="learn.tSituation">Situation</button>
+      </div>
+
+      <div class="learn-banner">
+        <div class="learn-banner-icon"><img src="/shared/logo.svg" alt=""></div>
+        <div>
+          <div class="card-title" data-i18n="learn.banner.t">DOH Dengue Prevention</div>
+          <p class="muted-text" data-i18n="learn.banner.d">Evidence-based guidance for Albay households</p>
+        </div>
+      </div>
+
+      <h1 class="section-title" data-i18n="learn.title">Know dengue. Protect your home.</h1>
+
+      <div class="learn-panel active" id="learn-5s">
+        <div class="card"><div class="card-title" data-i18n="learn.5s.1.t"></div><p class="muted-text" data-i18n="learn.5s.1.d"></p></div>
+        <div class="card"><div class="card-title" data-i18n="learn.5s.2.t"></div><p class="muted-text" data-i18n="learn.5s.2.d"></p></div>
+        <div class="card"><div class="card-title" data-i18n="learn.5s.3.t"></div><p class="muted-text" data-i18n="learn.5s.3.d"></p></div>
+        <div class="card"><div class="card-title" data-i18n="learn.5s.4.t"></div><p class="muted-text" data-i18n="learn.5s.4.d"></p></div>
+        <div class="card"><div class="card-title" data-i18n="learn.5s.5.t"></div><p class="muted-text" data-i18n="learn.5s.5.d"></p></div>
+      </div>
+
+      <div class="learn-panel" id="learn-symptoms">
+        <div class="card"><div class="card-title" data-i18n="learn.sym.1.t"></div><p class="muted-text" data-i18n="learn.sym.1.d"></p></div>
+        <div class="card"><div class="card-title" data-i18n="learn.sym.2.t"></div><p class="muted-text" data-i18n="learn.sym.2.d"></p></div>
+      </div>
+
+      <div class="learn-panel" id="learn-mosquito">
+        <div class="card"><div class="card-title" data-i18n="learn.mos.1.t"></div><p class="muted-text" data-i18n="learn.mos.1.d"></p></div>
+        <div class="card"><div class="card-title" data-i18n="learn.mos.2.t"></div><p class="muted-text" data-i18n="learn.mos.2.d"></p></div>
+      </div>
+
+      <div class="learn-panel" id="learn-myths">
+        <div class="card"><div class="card-title" data-i18n="learn.myth.1.t"></div><p class="muted-text" data-i18n="learn.myth.1.d"></p></div>
+        <div class="card"><div class="card-title" data-i18n="learn.myth.2.t"></div><p class="muted-text" data-i18n="learn.myth.2.d"></p></div>
+      </div>
+
+      <div class="learn-panel" id="learn-situation">
+        <div class="card"><div class="card-title" data-i18n="learn.sit.1.t"></div><p class="muted-text" data-i18n="learn.sit.1.d"></p></div>
+      </div>
+
+      <button type="button" class="btn-primary-pill" id="learn-to-check-btn" data-i18n="learn.cta">Check my symptoms now</button>
+    </section>
+
+    <!-- Toast feedback (announced to screen readers) -->
+    <div class="toast" id="app-toast" role="status" aria-live="polite"></div>
+
+    <!-- Bottom navigation: Home · Check · Learn -->
+    <nav class="bottom-nav" id="bottom-nav" data-i18n-aria="nav.aria" hidden>
+      <button type="button" class="nav-tab active" data-nav="screen-home">
+        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+        <span data-i18n="nav.home">Home</span>
+      </button>
+      <button type="button" class="nav-tab" data-nav="screen-check">
+        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
+        <span data-i18n="nav.check">Check</span>
+      </button>
+      <button type="button" class="nav-tab" data-nav="screen-learn">
+        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
+        <span data-i18n="nav.learn">Learn</span>
+      </button>
+    </nav>
+
+  </div>
+
+  <script type="module" src="/resident/app.js"></script>
 </body>
 </html>
