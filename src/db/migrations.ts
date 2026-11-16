@@ -251,4 +251,21 @@ CREATE INDEX idx_alert_barangay_time ON alert (barangay_id, issued_at);
 CREATE INDEX idx_event_time ON event_log (at);
 `;
 
-export const MIGRATIONS: Migration[] = [{ name: "001_init", sql: INIT }];
+// The daily question needs no sign-in, so no resident is stored for it: like the symptom counts,
+// only the barangay's totals per day are kept. The one-answer-a-day limit lives on the phone.
+const ANONYMOUS_ANSWERS = `
+CREATE TABLE anonymous_answer_count (
+  barangay_id ${BARANGAY},
+  date TEXT NOT NULL,
+  total INTEGER NOT NULL CHECK (total >= 0),
+  yes INTEGER NOT NULL CHECK (yes >= 0),
+  created_at ${NOW},
+  PRIMARY KEY (barangay_id, date),
+  CHECK (yes <= total)
+);
+`;
+
+export const MIGRATIONS: Migration[] = [
+  { name: "001_init", sql: INIT },
+  { name: "002_anonymous_answers", sql: ANONYMOUS_ANSWERS },
+];

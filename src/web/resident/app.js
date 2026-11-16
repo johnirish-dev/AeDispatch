@@ -3,7 +3,7 @@
 
 import { translate } from "./strings.js";
 import { store, todayText } from "./store.js";
-import { service, BARANGAYS, MUNICIPALITY } from "./service.js";
+import { service, ServiceError } from "./service.js";
 
 const $ = (id) => document.getElementById(id);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -22,6 +22,8 @@ const state = {
   resendSeconds: 0,
   resendTimer: null,
   currentScreen: null,
+  barangays: [], // [{ id, name, municipality }] from the server
+  loadFailed: false, // the barangay list could not be loaded
 };
 
 const t = (key, vars) => translate(state.lang, key, vars);
@@ -110,8 +112,30 @@ function setLanguage(lang) {
 
 // ---- barangays -----------------------------------------------------------------------------
 
-const barangayName = (id) => BARANGAYS.find((b) => b.id === id)?.name ?? "";
-const barangayLine = (id) => `${barangayName(id)}, ${MUNICIPALITY}`;
+const findBarangay = (id) => state.barangays.find((b) => b.id === id);
+const barangayName = (id) => findBarangay(id)?.name ?? "";
+const barangayLine = (id) => {
+  const b = findBarangay(id);
+  return b ? `${b.name}, ${b.municipality}` : "";
+};
+
+async function loadBarangays() {
+  try {
+    state.barangays = await service.listBarangays();
+    state.loadFailed = false;
+  } catch {
+    state.barangays = [];
+    state.loadFailed = true;
+  }
+}
+
+async function retryLoad() {
+  await loadBarangays();
+  renderBarangaySelect();
+  renderBarangayList();
+  renderAlertsOption();
+  renderHome();
+}
 
 function setBarangay(id) {
   state.barangayId = id;
@@ -121,9 +145,9 @@ function setBarangay(id) {
 function renderBarangaySelect() {
   const select = $("barangay-select");
   select.replaceChildren();
-  for (const b of BARANGAYS) {
+  for (const b of state.barangays) {
     const option = document.createElement("option");
-    option.value = b.id;
+    option.value = String(b.id);
     option.textContent = barangayLine(b.id);
     select.append(option);
   }
@@ -131,7 +155,7 @@ function renderBarangaySelect() {
   none.value = "__none";
   none.textContent = t("bgy.noneShort");
   select.append(none);
-  select.value = state.barangayId ?? "__none";
+  select.value = state.barangayId === null ? "__none" : String(state.barangayId);
 }
 
 // ---- intro slides --------------------------------------------------------------------------
@@ -169,13 +193,20 @@ function renderBarangayList() {
   const query = plain($("bgy-search").value.trim());
   list.replaceChildren();
 
-  const matches = BARANGAYS.filter((b) => plain(b.name).includes(query));
+  const matches = state.barangays.filter((b) => plain(b.name).includes(query));
   for (const b of matches) list.append(barangayRow(b.id, barangayLine(b.id)));
   list.append(barangayRow("__none", t("bgy.none")));
 
   const noMatch = $("bgy-nomatch");
   noMatch.hidden = !(query !== "" && matches.length === 0);
   noMatch.textContent = noMatch.hidden ? "" : t("bgy.noMatch", { q: $("bgy-search").value.trim() });
+  // The list could not be loaded: say so, and let the person try again.
+  list.hidden = state.loadFailed;
+  $("bgy-retry").hidden = !state.loadFailed;
+  if (state.loadFailed) {
+    noMatch.hidden = false;
+    noMatch.textContent = `${t("error.title")}. ${t("error.body")}`;
+  }
 
   $("bgy-notlisted").hidden = !state.draftNotListed;
   const button = $("bgy-continue");
@@ -253,16 +284,26 @@ const LEVELS = ["low", "moderate", "elevated", "high"];
 let renderToken = 0; // a later render replaces an earlier one that is still waiting for the data
 
 async function renderHome() {
-  const listed = state.barangayId !== null;
+  const listed = typeof state.barangayId === "number";
   $("home-listed").hidden = !listed;
+  $("home-error").hidden = true;
   $("home-nolisting").hidden = listed;
   $("alert-dot").hidden = true;
   renderDailyCard();
   if (!listed) return;
 
   const token = ++renderToken;
-  const risk = await service.getRisk(state.barangayId);
-  if (token !== renderToken || risk === null) return;
+  let risk = null;
+  try {
+    risk = await service.getRisk(state.barangayId);
+  } catch {
+    risk = null;
+  }
+  if (token !== renderToken) return;
+  const failed = risk === null || risk.level === null;
+  $("home-listed").hidden = failed;
+  $("home-error").hidden = !failed;
+  if (failed) return;
 
   $("home-hero-card").className = `card hero-card ${HERO_CLASS[risk.level]}`.trim();
   const pill = $("home-risk-pill");
@@ -331,7 +372,7 @@ async function answerDaily(answer, { full }) {
   try {
     await service.submitDailyAnswer(state.barangayId, answer);
   } catch {
-    showToast(t("toast.skipped"));
+    showToast(t("toast.notSent"));
     return;
   }
   store.set("answered", todayText());
@@ -370,15 +411,28 @@ async function renderAlerts() {
 
   const list = $("alerts-list");
   list.replaceChildren();
-  const risk = state.barangayId ? await service.getRisk(state.barangayId) : null;
-  if (risk === null) {
+  let risk = null;
+  if (typeof state.barangayId === "number") {
+    try {
+      risk = await service.getRisk(state.barangayId);
+    } catch {
+      risk = null;
+    }
+  }
+  if (risk === null || risk.level === null) {
     const empty = document.createElement("p");
     empty.className = "muted-text";
-    empty.textContent = t("alerts.noBarangay");
+    empty.textContent = state.barangayId === null ? t("alerts.noBarangay") : t("error.body");
     list.append(empty);
   } else {
     list.append(alertCard(risk.level, t("alerts.today"), t(`headline.${risk.level}`), true));
-    list.append(alertCard("moderate", t("alerts.earlier"), t("alerts.earlierBody"), false));
+    // Earlier alerts from the server (the one issued today at this level is the card above).
+    for (const a of risk.alerts) {
+      const when = new Date(a.issuedAt);
+      if (todayText(when) === todayText() && a.level === risk.level) continue;
+      const date = when.toLocaleDateString(t("locale"), { month: "short", day: "numeric" });
+      list.append(alertCard(a.level, date, t(`headline.${a.level}`), false));
+    }
   }
 
   const messages = $("messages-list");
@@ -466,10 +520,22 @@ async function sendPin() {
   error.hidden = true;
   $("phone-input").removeAttribute("aria-invalid");
   state.phone = digits;
-  await issuePin();
+  try {
+    await issuePin();
+  } catch (failure) {
+    error.textContent = pinErrorText(failure);
+    error.hidden = false;
+    return;
+  }
   renderPinTexts();
   showScreen("screen-pin");
   $$("#pin-boxes input")[0].focus();
+}
+
+function pinErrorText(failure) {
+  if (failure instanceof ServiceError && failure.status === 429) return t("pin.waitMore");
+  if (failure instanceof ServiceError && failure.status === 400) return t("signin.error");
+  return t("toast.notSent");
 }
 
 // Asks for a PIN and files the demo SMS in the Alerts messages.
@@ -561,7 +627,13 @@ async function verifyPin() {
     error.hidden = false;
     return;
   }
-  const result = await service.verifyPin(state.phone, pin);
+  let result;
+  try {
+    result = await service.verifyPin(state.phone, pin, state.barangayId);
+  } catch {
+    showToast(t("toast.notSent"));
+    return;
+  }
   if (result.ok) {
     state.signedIn = true;
     store.set("signedIn", true);
@@ -606,7 +678,21 @@ async function submitReport(event) {
   $$("#household-report-form input[type=checkbox]").forEach((box) => {
     flags[box.name] = box.checked;
   });
-  await service.submitReport(state.barangayId, flags);
+  try {
+    await service.submitReport(flags);
+  } catch (failure) {
+    if (failure instanceof ServiceError && failure.status === 401) {
+      // The sign-in ended (a session lasts 8 hours and is lost when the server restarts).
+      state.signedIn = false;
+      store.set("signedIn", false);
+      showToast(t("report.signInAgain"));
+      $("phone-error").hidden = true;
+      showScreen("screen-signin");
+    } else {
+      showToast(t("toast.notSent"));
+    }
+    return;
+  }
   event.target.reset();
   showToast(t("report.done"));
   showScreen("screen-home");
@@ -658,7 +744,7 @@ function wire() {
 
   $("barangay-select").addEventListener("change", (event) => {
     const value = event.target.value;
-    setBarangay(value === "__none" ? null : value);
+    setBarangay(value === "__none" ? null : Number(value));
     renderHome();
     renderAlerts();
   });
@@ -684,9 +770,15 @@ function wire() {
   $("pin-back").addEventListener("click", () => showScreen("screen-signin"));
   $("pin-change").addEventListener("click", () => showScreen("screen-signin"));
   $("pin-resend").addEventListener("click", async () => {
-    await issuePin();
-    showToast(t("pin.sent"));
+    try {
+      await issuePin();
+      showToast(t("pin.sent"));
+    } catch (failure) {
+      showToast(pinErrorText(failure));
+    }
   });
+  $("bgy-retry").addEventListener("click", retryLoad);
+  $("home-retry").addEventListener("click", retryLoad);
   $("pin-verify").addEventListener("click", verifyPin);
   $("household-report-form").addEventListener("submit", submitReport);
 
@@ -708,17 +800,39 @@ function wire() {
   $("learn-to-check-btn").addEventListener("click", () => showScreen("screen-check"));
 }
 
-function start() {
+// A barangay saved by an older version of this page (or one the server no longer has) is dropped.
+function storedBarangayIsValid() {
+  return state.barangayId === null || state.loadFailed || findBarangay(state.barangayId) !== undefined;
+}
+
+async function start() {
   buildPinBoxes();
   wire();
   applyLanguage();
   if (state.onboarded) {
-    goHome({ checkin: true });
+    await loadBarangays();
+    renderBarangaySelect();
+    if (storedBarangayIsValid()) {
+      goHome({ checkin: true });
+    } else {
+      setBarangay(null);
+      renderBarangaySelect();
+      openBarangayScreen(true);
+    }
   } else {
     showScreen("screen-splash");
+    loadBarangays().then(() => {
+      renderBarangaySelect();
+      renderBarangayList();
+    });
     setTimeout(() => {
       if (state.currentScreen === "screen-splash") showScreen("screen-intro");
     }, 1500);
+  }
+  // Is the saved sign-in still valid on the server?
+  if (state.signedIn && !(await service.isSignedIn())) {
+    state.signedIn = false;
+    store.set("signedIn", false);
   }
 }
 

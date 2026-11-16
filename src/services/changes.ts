@@ -17,9 +17,12 @@ import {
 } from "../db/repositories/barangayRepo";
 import { getResident } from "../db/repositories/userRepo";
 import {
+  addAnonymousAnswer,
   addSymptomCheck,
+  anonymousAnswersOn,
   insertDailyAnswer,
   insertHouseholdReport,
+  symptomChecksOn,
 } from "../db/repositories/signalRepo";
 import {
   NewContainer,
@@ -79,6 +82,16 @@ export interface BarangayInput {
   puroks?: unknown;
 }
 
+// Contributions that need no sign-in (the daily question, the symptom check) are capped per barangay
+// per day, so one script cannot swamp a barangay's signal. The cap is the larger of a minimum and a
+// share of the barangay's population. Plain constants on purpose: they are not scoring settings.
+const ANONYMOUS_DAILY_MINIMUM = 30;
+const ANONYMOUS_DAILY_SHARE = 0.05;
+
+export function anonymousDailyCap(population: number): number {
+  return Math.max(ANONYMOUS_DAILY_MINIMUM, Math.ceil(population * ANONYMOUS_DAILY_SHARE));
+}
+
 export class DataChanges {
   constructor(
     private readonly db: Db,
@@ -119,6 +132,23 @@ export class DataChanges {
 
   // ---- resident contributions (sign-in is Phase 8; these are what it calls) ---
 
+  /**
+   * The daily question without a sign-in: only the barangay's total for the day changes. The phone
+   * keeps the "once a day" rule; the server only caps how many one barangay can add in a day.
+   */
+  recordAnonymousAnswer(barangayId: number, answer: unknown): { saved: boolean } {
+    const a = v.oneOf(answer, "answer", ["yes", "no"] as const);
+    const barangay = getBarangay(this.db, barangayId);
+    if (!barangay) throw new AppError(404, "Barangay not found.");
+    const date = this.today();
+    if (anonymousAnswersOn(this.db, barangayId, date) >= anonymousDailyCap(barangay.population)) {
+      throw new AppError(429, "Today's check-in limit for this barangay has been reached.");
+    }
+    addAnonymousAnswer(this.db, { barangayId, date, answer: a, at: this.ranking.now().toISOString() });
+    this.ranking.rescore([barangayId], { reason: "daily answer" });
+    return { saved: true };
+  }
+
   /** One answer per resident per day. Returns false if they already answered today. */
   recordDailyAnswer(residentId: number, answer: unknown): { saved: boolean } {
     const a = v.oneOf(answer, "answer", ["yes", "no"] as const);
@@ -154,7 +184,11 @@ export class DataChanges {
 
   /** Anonymous: only the barangay's daily totals change. No resident is stored. */
   recordSymptomCheck(barangayId: number, warningSigns: unknown): void {
-    if (!getBarangay(this.db, barangayId)) throw new AppError(404, "Barangay not found.");
+    const barangay = getBarangay(this.db, barangayId);
+    if (!barangay) throw new AppError(404, "Barangay not found.");
+    if (symptomChecksOn(this.db, barangayId, this.today()) >= anonymousDailyCap(barangay.population)) {
+      throw new AppError(429, "Today's symptom-check limit for this barangay has been reached.");
+    }
     addSymptomCheck(this.db, {
       barangayId,
       date: this.today(),

@@ -62,13 +62,21 @@ export function deleteSimulatedWeather(db: Db, municipality: string): number {
   return db.prepare("DELETE FROM weather_record WHERE municipality = ? AND source = 'simulated'").run(municipality).changes;
 }
 
+/** Daily answers of signed-in residents plus the anonymous totals (the daily question needs no sign-in). */
 export function answerTotals(db: Db, barangayId: number, from: string, to: string) {
-  return db
+  const signedIn = db
     .prepare(
       `SELECT COUNT(*) AS total, COALESCE(SUM(answer = 'yes'), 0) AS yes
        FROM daily_answer WHERE barangay_id = ? AND date BETWEEN ? AND ?`,
     )
     .get(barangayId, from, to) as { total: number; yes: number };
+  const anonymous = db
+    .prepare(
+      `SELECT COALESCE(SUM(total), 0) AS total, COALESCE(SUM(yes), 0) AS yes
+       FROM anonymous_answer_count WHERE barangay_id = ? AND date BETWEEN ? AND ?`,
+    )
+    .get(barangayId, from, to) as { total: number; yes: number };
+  return { total: signedIn.total + anonymous.total, yes: signedIn.yes + anonymous.yes };
 }
 
 export function reportTotals(db: Db, barangayId: number, from: string, to: string) {
@@ -106,6 +114,35 @@ export function surveyTotals(db: Db, barangayId: number, from: string, to: strin
 }
 
 // ---- resident and symptom writes -------------------------------------------
+
+/** Adds one anonymous daily answer to the barangay's total for the day. No person is stored. */
+export function addAnonymousAnswer(
+  db: Db,
+  a: { barangayId: number; date: string; answer: "yes" | "no"; at?: string },
+): void {
+  const at = a.at ?? new Date().toISOString();
+  db.prepare(
+    `INSERT INTO anonymous_answer_count (barangay_id, date, total, yes, created_at)
+     VALUES (@barangayId, @date, 1, @yes, @at)
+     ON CONFLICT (barangay_id, date) DO UPDATE SET total = total + 1, yes = yes + @yes`,
+  ).run({ barangayId: a.barangayId, date: a.date, yes: a.answer === "yes" ? 1 : 0, at });
+}
+
+/** Anonymous answers already counted for this barangay on this day (for the daily cap). */
+export function anonymousAnswersOn(db: Db, barangayId: number, date: string): number {
+  const row = db
+    .prepare("SELECT total FROM anonymous_answer_count WHERE barangay_id = ? AND date = ?")
+    .get(barangayId, date) as { total: number } | undefined;
+  return row?.total ?? 0;
+}
+
+/** Symptom checks already counted for this barangay on this day (for the daily cap). */
+export function symptomChecksOn(db: Db, barangayId: number, date: string): number {
+  const row = db
+    .prepare("SELECT checks FROM symptom_count WHERE barangay_id = ? AND date = ?")
+    .get(barangayId, date) as { checks: number } | undefined;
+  return row?.checks ?? 0;
+}
 
 /** One answer per resident per day. Returns false if they already answered today. */
 export function insertDailyAnswer(

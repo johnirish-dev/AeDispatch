@@ -9,6 +9,7 @@ import { caseRoutes } from "./api/officer/cases";
 import { evaluationRoutes } from "./api/officer/evaluation";
 import { rankingRoutes } from "./api/officer/ranking";
 import { bhwRoutes } from "./api/bhw";
+import { residentRoutes } from "./api/resident";
 
 // The app is built here and started in server.ts, so tests can use it without
 // opening a fixed port. Without `deps` it serves only the health check.
@@ -25,6 +26,8 @@ export function createApp(deps?: AppDeps) {
     // Officer routes need the signed-in session; BHW routes need a valid token.
     app.use("/api/officer", requireOfficer(deps.sessions), rankingRoutes(deps), caseRoutes(deps), barangayRoutes(deps), activityRoutes(deps), evaluationRoutes());
     app.use("/api/bhw", requireBhw(deps.db), bhwRoutes(deps));
+    // Residents: mostly open (risk level, daily question, symptom check); the report needs the PIN sign-in.
+    app.use("/api/resident", residentRoutes(deps));
   }
 
   app.use("/api", notFound);
