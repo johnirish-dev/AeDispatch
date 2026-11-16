@@ -104,6 +104,7 @@
 
       <div class="bgy-list" id="bgy-list" role="radiogroup" data-i18n-aria="bgy.title"></div>
       <p class="muted-text" id="bgy-nomatch" role="status" hidden></p>
+      <button type="button" class="btn-outline-pill" id="bgy-retry" hidden data-i18n="error.retry">Try again</button>
 
       <div class="notice-card" id="bgy-notlisted" role="status" hidden>
         <h2 class="card-title" data-i18n="bgy.notListedTitle">Your barangay isn't in the system yet</h2>
@@ -261,6 +262,14 @@
           <h2 class="card-title" data-i18n="reportcard.title">Anything around your home?</h2>
           <p class="muted-text" data-i18n="reportcard.body">Optional. You'll sign in with your mobile number to send a report.</p>
           <button type="button" class="btn-outline-pill" id="open-report-btn" style="margin-top: 12px;" data-i18n="reportcard.btn">Report what you see</button>
+        </div>
+      </div>
+
+      <div id="home-error" class="stack" hidden>
+        <div class="card notice-card">
+          <h1 class="section-title" data-i18n="error.title">We can't load this right now</h1>
+          <p class="muted-text" style="margin-top: 8px;" data-i18n="error.body">Check your connection and try again.</p>
+          <button type="button" class="btn-outline-pill" id="home-retry" style="margin-top: 14px;" data-i18n="error.retry">Try again</button>
         </div>
       </div>
 

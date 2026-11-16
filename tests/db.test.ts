@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { DEFAULT_PARAMETERS } from "../src/algorithms/parameters";
 import { runMigrations } from "../src/db/migrate";
+import { MIGRATIONS } from "../src/db/migrations";
 import {
   addPurok, createBarangay, deleteBarangay, densityRatios, getBarangay, listBarangays, updateBarangay,
 } from "../src/db/repositories/barangayRepo";
@@ -31,7 +32,7 @@ describe("schema", () => {
   it("runs migrations once and only once", () => {
     const db = emptyDb();
     expect(runMigrations(db)).toEqual([]);
-    expect(count(db, "schema_migrations")).toBe(1);
+    expect(count(db, "schema_migrations")).toBe(MIGRATIONS.length); // one row per migration, none twice
   });
 
   it("enforces foreign keys and check constraints", () => {

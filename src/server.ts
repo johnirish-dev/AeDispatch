@@ -32,6 +32,10 @@ try {
   fail(`The stored model settings are out of date (${(err as Error).message}).\nRun \`npm run seed\` to rebuild the sample database.`);
 }
 
+if (!process.env.PHONE_HASH_SALT) {
+  console.warn("PHONE_HASH_SALT is not set: using the development salt. Set it in .env before real use.");
+}
+
 const ranking = new RankingService(db);
 try {
   ranking.start();

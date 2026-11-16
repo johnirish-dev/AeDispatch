@@ -149,6 +149,7 @@ export const strings = {
     "pin.tooMany": "Too many tries. Ask for a new PIN.",
     "pin.expired": "This PIN has expired. Ask for a new one.",
     "pin.sent": "A new PIN was sent (demo)",
+    "pin.waitMore": "Please wait a moment before asking for a new PIN.",
     "pin.signedIn": "Signed in",
 
     "report.close": "Close",
@@ -163,6 +164,7 @@ export const strings = {
     "report.skip": "Skip for now",
     "report.note": "Stored only as barangay totals. No photos or addresses.",
     "report.done": "Anonymous barangay report submitted",
+    "report.signInAgain": "Please sign in again to send your report.",
 
     "check.title": "How are you feeling?",
     "check.symptoms": "Symptoms",
@@ -226,6 +228,10 @@ export const strings = {
     "nav.learn": "Learn",
 
     "toast.skipped": "Daily check-in skipped",
+    "toast.notSent": "Could not send. Please try again.",
+    "error.title": "We can't load this right now",
+    "error.body": "Check your connection and try again.",
+    "error.retry": "Try again",
     "toast.alertsOn": "Alerts are on",
     "toast.alertsOff": "Alerts are off",
 
@@ -400,6 +406,7 @@ export const strings = {
     "pin.tooMany": "Napakaraming pagsubok. Humingi ng bagong PIN.",
     "pin.expired": "Nag-expire na ang PIN. Humingi ng bago.",
     "pin.sent": "May bagong PIN na ipinadala (demo)",
+    "pin.waitMore": "Maghintay sandali bago humingi ng bagong PIN.",
     "pin.signedIn": "Naka-sign in na",
 
     "report.close": "Isara",
@@ -414,6 +421,7 @@ export const strings = {
     "report.skip": "Laktawan muna",
     "report.note": "Barangay totals lang ang iniimbak. Walang larawan o address.",
     "report.done": "Naisumite na ang anonymous na ulat para sa barangay",
+    "report.signInAgain": "Mag-sign in muli para maipadala ang ulat.",
 
     "check.title": "Ano ang inyong nararamdaman?",
     "check.symptoms": "Mga sintomas",
@@ -477,6 +485,10 @@ export const strings = {
     "nav.learn": "Alamin",
 
     "toast.skipped": "Nilaktawan ang check-in ngayong araw",
+    "toast.notSent": "Hindi naipadala. Subukang muli.",
+    "error.title": "Hindi ito ma-load ngayon",
+    "error.body": "Suriin ang inyong koneksyon at subukang muli.",
+    "error.retry": "Subukang muli",
     "toast.alertsOn": "Naka-on ang mga alerto",
     "toast.alertsOff": "Naka-off ang mga alerto",
 
