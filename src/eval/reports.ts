@@ -8,6 +8,7 @@ import { PerformanceReport, performanceCsv } from "./performance";
 import { QualityReport, qualityCsv } from "./quality";
 import { RobustnessReport, robustnessCsv } from "./robustness";
 import { SensitivityReport, sensitivityCsv } from "./sensitivity";
+import { TierReport, capacityCsv, tiersCsv } from "./tiers";
 
 export interface EvaluationFile {
   /** When the run finished (ISO time). */
@@ -21,6 +22,8 @@ export interface EvaluationFile {
   robustness?: RobustnessReport;
   /** How the early-warning result changes when the simulator's assumptions are weakened. */
   sensitivity?: SensitivityReport;
+  /** Tier 1, the capacity curve and Tier 2 (Objective 2). */
+  tiers?: TierReport;
   /** The Max Heap against re-sorting the whole list, measured on the machine named inside it (Objective 4). */
   performance?: PerformanceReport;
 }
@@ -37,6 +40,10 @@ export function writeReports(outDir: string, file: EvaluationFile): void {
   fs.writeFileSync(path.join(outDir, "quality.csv"), qualityCsv(file.quality));
   if (file.robustness) fs.writeFileSync(path.join(outDir, "robustness.csv"), robustnessCsv(file.robustness));
   if (file.sensitivity) fs.writeFileSync(path.join(outDir, "sensitivity.csv"), sensitivityCsv(file.sensitivity));
+  if (file.tiers) {
+    fs.writeFileSync(path.join(outDir, "tiers.csv"), tiersCsv(file.tiers));
+    fs.writeFileSync(path.join(outDir, "capacity.csv"), capacityCsv(file.tiers));
+  }
   if (file.performance) fs.writeFileSync(path.join(outDir, "performance.csv"), performanceCsv(file.performance));
 }
 

@@ -8,6 +8,7 @@ import { QualityOptions, formatQuality, runQuality } from "./quality";
 import { EvaluationFile, reportsDir, writeReports } from "./reports";
 import { RobustnessOptions, formatRobustness, runRobustness } from "./robustness";
 import { SensitivityOptions, formatSensitivity, runSensitivity } from "./sensitivity";
+import { TierOptions, formatTiers, runTiers } from "./tiers";
 
 const quick = process.argv.includes("--quick");
 
@@ -20,6 +21,11 @@ const quality: QualityOptions = quick
 const stress: RobustnessOptions & SensitivityOptions = quick
   ? { barangays: 100, weeks: 14, seeds: [1, 2, 3], k: 5, randomShuffles: 30 }
   : { barangays: 360, weeks: 24, seeds: Array.from({ length: 10 }, (_, i) => i + 1), k: 10, randomShuffles: 100 };
+
+// Tier 1, the capacity curve and Tier 2: the same municipality size as the quality run.
+const tierOptions: TierOptions = quick
+  ? { barangays: 100, weeks: 16, seeds: [1, 2, 3, 4, 5], maxK: 20, overCapacityKs: [3, 5, 10, 20], randomShuffles: 30 }
+  : { barangays: 720, weeks: 30, seeds: Array.from({ length: 30 }, (_, i) => i + 1), maxK: 20, overCapacityKs: [3, 5, 10, 20], randomShuffles: 100 };
 
 // Heap against re-sort. Full: the sizes of the brief (8 = the demo, 720 = Albay, 42,010 = the Philippines).
 // Quick: stops at 5,000 so it stays within a few seconds. The timings are measured, never typed in.
@@ -43,10 +49,14 @@ function main(): void {
   console.log(formatSensitivity(sensitivity));
 
   console.log("\n" + "-".repeat(100));
+  const tiers = runTiers(tierOptions);
+  console.log(formatTiers(tiers));
+
+  console.log("\n" + "-".repeat(100));
   const timing = runPerformance(timingOptions, (line) => console.log(line));
   console.log(formatPerformance(timing));
 
-  const file: EvaluationFile = { generatedAt: new Date().toISOString(), mode: quick ? "quick" : "full", node: process.version, quality: report, robustness, sensitivity, performance: timing };
+  const file: EvaluationFile = { generatedAt: new Date().toISOString(), mode: quick ? "quick" : "full", node: process.version, quality: report, robustness, sensitivity, tiers, performance: timing };
   const dir = reportsDir();
   writeReports(dir, file);
 
