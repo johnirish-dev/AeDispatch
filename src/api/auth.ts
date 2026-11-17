@@ -12,8 +12,7 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { Router } from "express";
 import type { Request, RequestHandler, Response } from "express";
 import type { Db } from "../db/connection";
-import { findBhwByTokenHash, findStaffByUsername } from "../db/repositories/userRepo";
-import type { Bhw } from "../db/repositories/userRepo";
+import { findBarangayIdByTokenHash, findStaffByUsername } from "../db/repositories/userRepo";
 import { hashPassword, hashToken, verifyPassword } from "../db/security";
 import { AppError } from "../errors";
 import * as v from "../validate";
@@ -42,7 +41,8 @@ declare global {
   namespace Express {
     interface Request {
       officer?: OfficerUser;
-      bhw?: Bhw;
+      /** The barangay the BHW access token opens. */
+      bhwBarangayId?: number;
       residentId?: number;
     }
   }
@@ -128,9 +128,9 @@ export function requireBhw(db: Db): RequestHandler {
   return (req, _res, next) => {
     const header = req.headers.authorization ?? "";
     const token = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
-    const bhw = token === "" ? undefined : findBhwByTokenHash(db, hashToken(token));
-    if (!bhw) return next(new AppError(401, "This link is not valid. Ask the health office for a new one."));
-    req.bhw = bhw;
+    const barangayId = token === "" ? undefined : findBarangayIdByTokenHash(db, hashToken(token));
+    if (barangayId === undefined) return next(new AppError(401, "This link is not valid. Ask the health office for a new one."));
+    req.bhwBarangayId = barangayId;
     next();
   };
 }

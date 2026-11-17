@@ -21,6 +21,14 @@ import { hashPassword, hashPhone, hashToken } from "./security";
 
 export const SEED_WEEKS = 8;
 const SEED_DAYS = SEED_WEEKS * 7;
+/**
+ * The access token of the sample barangay at this position of SAMPLE_BARANGAYS. The seed stores only its hash.
+ * The Demo tools page rebuilds the phone links from the same rule, so these links work for the SAMPLE data only.
+ */
+export function sampleBarangayToken(index: number): string {
+  return createHash("sha256").update(`sample-barangay-token-${index}`).digest("hex").slice(0, 24);
+}
+
 export const OFFICER_USERNAME = "officer";
 export const OFFICER_PASSWORD = "demo1234";
 
@@ -35,11 +43,11 @@ export interface SeedSummary {
   startDate: string;
   currentWeek: string;
   counts: Record<string, number>;
-  bhwTokens: { name: string; barangay: string; token: string }[];
+  barangayTokens: { barangay: string; token: string }[];
 }
 
 const TABLES = [
-  "barangay", "purok", "staff_user", "bhw", "resident", "daily_answer", "household_report",
+  "barangay", "purok", "staff_user", "bhw", "barangay_access", "resident", "daily_answer", "household_report",
   "symptom_count", "weather_record", "case_record", "case_import", "model_parameters",
   "threat_score", "recommendation", "field_task", "entomological_survey", "survey_container", "event_log",
 ];
@@ -61,7 +69,7 @@ export function seedDatabase(db: Db, opts: SeedOptions): SeedSummary {
   const weekLabel = (w: number) => formatIsoWeek(isoWeekOf(weekStart(w)));
   const phoneSalt = opts.phoneSalt ?? "sample-phone-salt";
   const rng = mulberry32(2026);
-  const bhwTokens: SeedSummary["bhwTokens"] = [];
+  const barangayTokens: SeedSummary["barangayTokens"] = [];
 
   db.transaction(() => {
     // --- parameters (version from the code defaults, active) -----------------
@@ -112,10 +120,16 @@ export function seedDatabase(db: Db, opts: SeedOptions): SeedSummary {
     );
     SAMPLE_BHWS.forEach((b, i) => {
       const index = SAMPLE_BARANGAYS.findIndex((s) => s.name === b.barangay);
-      const token = createHash("sha256").update(`sample-bhw-token-${i}`).digest("hex").slice(0, 24);
-      const id = Number(insBhw.run(b.displayName, barangayId[index], b.team, hashToken(token), NOW, NOW).lastInsertRowid);
+      // The per-person token column is not used any more; it only needs a unique value.
+      const id = Number(insBhw.run(b.displayName, barangayId[index], b.team, hashToken(`unused-bhw-token-${i}`), NOW, NOW).lastInsertRowid);
       bhwOfBarangay.set(index, { id, name: b.displayName });
-      bhwTokens.push({ name: b.displayName, barangay: b.barangay, token });
+    });
+    // One access token per barangay: the BHW screens open with it.
+    const insAccess = db.prepare("INSERT INTO barangay_access (barangay_id, access_token_hash, created_at) VALUES (?, ?, ?)");
+    SAMPLE_BARANGAYS.forEach((s, index) => {
+      const token = sampleBarangayToken(index);
+      insAccess.run(barangayId[index], hashToken(token), NOW);
+      barangayTokens.push({ barangay: s.name, token });
     });
 
     // --- simulated signals -------------------------------------------------
@@ -380,5 +394,5 @@ export function seedDatabase(db: Db, opts: SeedOptions): SeedSummary {
 
   const counts: Record<string, number> = {};
   for (const t of TABLES) counts[t] = (db.prepare(`SELECT COUNT(*) AS n FROM ${t}`).get() as { n: number }).n;
-  return { anchorDate: anchor, startDate: startMonday, currentWeek: formatIsoWeek(current), counts, bhwTokens };
+  return { anchorDate: anchor, startDate: startMonday, currentWeek: formatIsoWeek(current), counts, barangayTokens };
 }

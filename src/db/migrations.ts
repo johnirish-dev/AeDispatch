@@ -265,7 +265,18 @@ CREATE TABLE anonymous_answer_count (
 );
 `;
 
+// One access token per barangay (the BHW screens open with it). The person who did an interview is chosen on
+// the form from the barangay's registered BHWs; the old per-person token column on bhw is no longer used.
+const BARANGAY_ACCESS = `
+CREATE TABLE barangay_access (
+  barangay_id INTEGER PRIMARY KEY REFERENCES barangay(id) ON DELETE CASCADE,
+  access_token_hash TEXT NOT NULL UNIQUE,
+  created_at ${NOW}
+);
+`;
+
 export const MIGRATIONS: Migration[] = [
   { name: "001_init", sql: INIT },
   { name: "002_anonymous_answers", sql: ANONYMOUS_ANSWERS },
+  { name: "003_barangay_access", sql: BARANGAY_ACCESS },
 ];

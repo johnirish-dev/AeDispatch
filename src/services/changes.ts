@@ -32,7 +32,7 @@ import {
   insertSurvey,
   updateTaskStatus,
 } from "../db/repositories/workflowRepo";
-import type { Bhw } from "../db/repositories/userRepo";
+import { getBhw } from "../db/repositories/userRepo";
 import { AppError, isUniqueViolation } from "../errors";
 import * as v from "../validate";
 import { formatDate } from "../util/dates";
@@ -66,7 +66,8 @@ export interface SurveySubmission {
   storeys?: unknown;
   rooms?: unknown;
   screened?: unknown;
-  surveyedBy: unknown;
+  /** The BHW who did the interview: one of the barangay's registered BHWs, chosen on the form. */
+  interviewerId: unknown;
   surveyDate: unknown;
   noContainersFound?: unknown;
   containers?: unknown;
@@ -210,29 +211,33 @@ export class DataChanges {
    * Checks a submitted entomological survey like the paper form, saves it with
    * its containers, updates the task, logs it and re-scores the barangay.
    */
-  submitSurvey(bhw: Bhw, s: SurveySubmission): { surveyId: number } {
+  submitSurvey(barangayId: number, s: SurveySubmission): { surveyId: number } {
     const surveyDate = v.dateText(s.surveyDate, "surveyDate");
     if (surveyDate > this.today()) throw new AppError(400, "The survey date cannot be in the future.");
 
     const purokId = v.int(s.purokId, "purokId", 1, Number.MAX_SAFE_INTEGER);
     const purok = getPurok(this.db, purokId);
-    if (!purok || purok.barangayId !== bhw.barangayId) {
+    if (!purok || purok.barangayId !== barangayId) {
       throw new AppError(400, "That purok is not in your barangay.");
     }
+
+    const interviewerId = v.int(s.interviewerId, "interviewerId", 1, Number.MAX_SAFE_INTEGER);
+    const interviewer = getBhw(this.db, interviewerId);
+    if (!interviewer || interviewer.barangayId !== barangayId) throw new AppError(400, "Choose who did the interview from the list of this barangay's BHWs.");
 
     let taskId: number | null = null;
     let taskStatus: TaskStatus | null = null;
     if (s.taskId !== undefined && s.taskId !== null) {
       taskId = v.int(s.taskId, "taskId", 1, Number.MAX_SAFE_INTEGER);
       const task = getTask(this.db, taskId);
-      if (!task || task.bhwId !== bhw.id) throw new AppError(400, "That task is not assigned to you.");
+      if (!task || task.barangayId !== barangayId) throw new AppError(400, "That task is not assigned to your barangay.");
       taskStatus = task.status;
     }
 
     const noContainersFound = s.noContainersFound === undefined ? false : v.bool(s.noContainersFound, "noContainersFound");
     const containers = this.checkContainers(s.containers, noContainersFound);
 
-    const surveyedBy = v.text(s.surveyedBy, "surveyedBy", 100);
+    const surveyedBy = interviewer.displayName;
     const houseNo = v.text(s.houseNo, "houseNo", 40);
     const submittedAt = this.ranking.now().toISOString();
     const markDone = s.completeTask === true;
@@ -242,8 +247,8 @@ export class DataChanges {
         this.db,
         {
           taskId,
-          bhwId: bhw.id,
-          barangayId: bhw.barangayId,
+          bhwId: interviewer.id,
+          barangayId,
           purokId,
           houseNo,
           headOfFamily: v.optionalText(s.headOfFamily, "headOfFamily", 100),
@@ -269,11 +274,11 @@ export class DataChanges {
         else if (taskStatus === "new") updateTaskStatus(this.db, taskId, "in_progress", submittedAt);
       }
       // The log never carries the household details: only who, where, when.
-      addEvent(this.db, "submission", `${bhw.displayName} submitted a survey for ${this.barangayName(bhw.barangayId)} (${purok.name})`, submittedAt);
+      addEvent(this.db, "submission", `${interviewer.displayName} submitted a survey for ${this.barangayName(barangayId)} (${purok.name})`, submittedAt);
       return id;
     })();
 
-    this.ranking.rescore([bhw.barangayId], { reason: "survey submitted" });
+    this.ranking.rescore([barangayId], { reason: "survey submitted" });
     return { surveyId };
   }
 

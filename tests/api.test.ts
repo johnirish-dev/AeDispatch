@@ -21,7 +21,7 @@ async function ranking(c: Client, k?: number) {
   return res.body as { k: number; barangays: Row[]; summary: Record<string, unknown> };
 }
 
-const tokenFor = (api: Api, name: string) => api.bhwTokens.find((t) => t.name === name)!.token;
+const tokenFor = (api: Api, barangay: string) => api.barangayTokens.find((t) => t.barangay === barangay)!.token;
 
 // ---- sign-in and access ---------------------------------------------------------
 
@@ -110,24 +110,25 @@ describe("BHW token and resident session", () => {
   it("BHW routes need a valid token", async () => {
     expect((await api.client().get("/api/bhw/me")).status).toBe(401);
     expect((await api.client().withBhwToken("not-a-token").get("/api/bhw/me")).status).toBe(401);
-    const res = await api.client().withBhwToken(tokenFor(api, "Jun M. Santos")).get("/api/bhw/me");
+    const res = await api.client().withBhwToken(tokenFor(api, "Peñafrancia")).get("/api/bhw/me");
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ name: "Jun M. Santos", team: "Team B", barangay: { name: "Peñafrancia" } });
+    expect(res.body).toMatchObject({ barangay: { name: "Peñafrancia" }, bhws: [{ name: "Jun M. Santos", team: "Team B" }] });
     expect(res.body.puroks.length).toBeGreaterThan(0);
+    expect(res.body.name).toBeUndefined(); // the token opens a barangay, not a person
   });
 
   it("an officer session does not open BHW routes, and a BHW token does not open officer routes", async () => {
     const officer = await api.officer();
     expect((await officer.get("/api/bhw/me")).status).toBe(401);
-    const bhw = api.client().withBhwToken(tokenFor(api, "Jun M. Santos"));
+    const bhw = api.client().withBhwToken(tokenFor(api, "Peñafrancia"));
     expect((await bhw.get("/api/officer/ranking")).status).toBe(401);
   });
 
-  it("a BHW sees only their own tasks", async () => {
-    const jun = api.client().withBhwToken(tokenFor(api, "Jun M. Santos"));
+  it("a barangay token shows only that barangay's tasks", async () => {
+    const jun = api.client().withBhwToken(tokenFor(api, "Peñafrancia"));
     const tasks = (await jun.get("/api/bhw/tasks")).body as { barangayId: number }[];
     expect(tasks.length).toBeGreaterThan(0);
-    const rico = api.client().withBhwToken(tokenFor(api, "Rico T. Mendoza"));
+    const rico = api.client().withBhwToken(tokenFor(api, "Mabini"));
     expect(((await rico.get("/api/bhw/tasks")).body as unknown[]).length).toBe(0);
   });
 
@@ -316,7 +317,7 @@ describe("confirm and reject", () => {
       expect(events[0]).toMatchObject({ type: "decision" });
       expect(events[0].text).toContain(row.name);
       // and the BHW sees it
-      const bhwToken = api.bhwTokens.find((t) => t.barangay === row.name)!.token;
+      const bhwToken = tokenFor(api, row.name);
       const mine = (await api.client().withBhwToken(bhwToken).get("/api/bhw/tasks")).body as { id: number }[];
       expect(mine.map((t) => t.id)).toContain(res.body.taskId);
     } finally {
@@ -448,13 +449,13 @@ describe("confirm and reject", () => {
 // ---- a submitted survey changes the ranking -----------------------------------------
 
 describe("BHW survey through the API", () => {
-  const survey = (purokId: number, extra: Record<string, unknown> = {}) => ({
+  const survey = (purokId: number, interviewerId: number, extra: Record<string, unknown> = {}) => ({
     purokId,
     houseNo: "21",
     headOfFamily: "Private Name",
     age: 38,
     sex: "Male",
-    surveyedBy: "Rico T. Mendoza",
+    interviewerId,
     surveyDate: ANCHOR,
     noContainersFound: false,
     containers: [{ location: "outdoor", containerType: "Drum", total: 50, withCover: 0, withoutCover: 50, positive: 45, larvaeCount: 300, pupaeCount: 20 }],
@@ -468,10 +469,10 @@ describe("BHW survey through the API", () => {
       const before = await ranking(officer);
       const mabini = before.barangays.find((b) => b.name === "Mabini")!;
 
-      const rico = api.client().withBhwToken(tokenFor(api, "Rico T. Mendoza"));
-      const me = (await rico.get("/api/bhw/me")).body as { puroks: { id: number }[] };
+      const rico = api.client().withBhwToken(tokenFor(api, "Mabini"));
+      const me = (await rico.get("/api/bhw/me")).body as { puroks: { id: number }[]; bhws: { id: number }[] };
       api.lines.length = 0;
-      const res = await rico.post("/api/bhw/surveys", survey(me.puroks[0].id));
+      const res = await rico.post("/api/bhw/surveys", survey(me.puroks[0].id, me.bhws[0].id));
       expect(res.status).toBe(201);
       expect(api.lines.some((l) => /^\[rescore\] 1 barangays in \d+\.\d ms \(survey submitted\)$/.test(l))).toBe(true);
 
@@ -499,15 +500,15 @@ describe("BHW survey through the API", () => {
   it("rejects an invalid survey and saves nothing; a BHW cannot use another barangay's purok", async () => {
     const api = await startApi();
     try {
-      const rico = api.client().withBhwToken(tokenFor(api, "Rico T. Mendoza"));
-      const me = (await rico.get("/api/bhw/me")).body as { puroks: { id: number }[] };
+      const rico = api.client().withBhwToken(tokenFor(api, "Mabini"));
+      const me = (await rico.get("/api/bhw/me")).body as { puroks: { id: number }[]; bhws: { id: number }[] };
       const surveys = count(api.db, "entomological_survey");
       const scores = count(api.db, "threat_score");
-      const bad = await rico.post("/api/bhw/surveys", survey(me.puroks[0].id, { containers: [{ location: "indoor", containerType: "Jar", total: 3, withCover: 1, withoutCover: 1, positive: 0 }] }));
+      const bad = await rico.post("/api/bhw/surveys", survey(me.puroks[0].id, me.bhws[0].id, { containers: [{ location: "indoor", containerType: "Jar", total: 3, withCover: 1, withoutCover: 1, positive: 0 }] }));
       expect(bad.status).toBe(400);
       expect(bad.body.error).toMatch(/with cover \+ without cover/);
       const tagasPurok = (api.db.prepare("SELECT p.id FROM purok p JOIN barangay b ON b.id = p.barangay_id WHERE b.name = 'Tagas' LIMIT 1").get() as { id: number }).id;
-      const other = await rico.post("/api/bhw/surveys", survey(tagasPurok));
+      const other = await rico.post("/api/bhw/surveys", survey(tagasPurok, me.bhws[0].id));
       expect(other.status).toBe(400);
       expect(count(api.db, "entomological_survey")).toBe(surveys);
       expect(count(api.db, "threat_score")).toBe(scores);
@@ -520,9 +521,9 @@ describe("BHW survey through the API", () => {
     const api = await startApi();
     try {
       const officer = await api.officer();
-      const rico = api.client().withBhwToken(tokenFor(api, "Rico T. Mendoza"));
-      const me = (await rico.get("/api/bhw/me")).body as { puroks: { id: number }[] };
-      const { body } = await rico.post("/api/bhw/surveys", survey(me.puroks[0].id));
+      const rico = api.client().withBhwToken(tokenFor(api, "Mabini"));
+      const me = (await rico.get("/api/bhw/me")).body as { puroks: { id: number }[]; bhws: { id: number }[] };
+      const { body } = await rico.post("/api/bhw/surveys", survey(me.puroks[0].id, me.bhws[0].id));
       const one = await officer.get(`/api/officer/findings/${body.surveyId}`);
       expect(one.status).toBe(200);
       expect(one.body).toMatchObject({ headOfFamily: "Private Name", houseNo: "21", barangayName: "Mabini" });
@@ -709,10 +710,10 @@ describe("restart", () => {
     try {
       const officer = await api.officer();
       // change things first: a survey and a case import
-      const rico = api.client().withBhwToken(tokenFor(api, "Rico T. Mendoza"));
-      const me = (await rico.get("/api/bhw/me")).body as { puroks: { id: number }[] };
+      const rico = api.client().withBhwToken(tokenFor(api, "Mabini"));
+      const me = (await rico.get("/api/bhw/me")).body as { puroks: { id: number }[]; bhws: { id: number }[] };
       await rico.post("/api/bhw/surveys", {
-        purokId: me.puroks[0].id, houseNo: "1", surveyedBy: "Rico T. Mendoza", surveyDate: ANCHOR, noContainersFound: false,
+        purokId: me.puroks[0].id, houseNo: "1", interviewerId: me.bhws[0].id, surveyDate: ANCHOR, noContainersFound: false,
         containers: [{ location: "indoor", containerType: "Jar", total: 10, withCover: 0, withoutCover: 10, positive: 9 }],
       });
       await officer.post("/api/officer/cases/import", { text: dataFile("cases_valid.csv") });

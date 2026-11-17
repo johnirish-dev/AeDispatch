@@ -31,8 +31,8 @@ function main(): void {
   console.log(`Sample "today": ${summary.anchorDate} (${summary.currentWeek}), history from ${summary.startDate}`);
   console.log(summary.counts);
   console.log(`\nOfficer login: ${OFFICER_USERNAME} / ${OFFICER_PASSWORD}`);
-  console.log("BHW access tokens (sample):");
-  for (const t of summary.bhwTokens) console.log(`  ${t.name} (${t.barangay}): ${t.token}`);
+  console.log("BHW access tokens, one per barangay (sample):");
+  for (const t of summary.barangayTokens) console.log(`  ${t.barangay}: ${t.token}`);
 }
 
 main();

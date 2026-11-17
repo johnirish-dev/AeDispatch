@@ -40,8 +40,8 @@ describe("spot check", () => {
       expect(events[0].text).toContain("Rising symptom checks near the school");
 
       // the BHW of that barangay sees the task
-      const bhw = api.bhwTokens.find((t) => t.barangay === row.name)!;
-      const mine = (await api.client().withBhwToken(bhw.token).get("/api/bhw/tasks")).body as { id: number; type: string }[];
+      const access = api.barangayTokens.find((t) => t.barangay === row.name)!;
+      const mine = (await api.client().withBhwToken(access.token).get("/api/bhw/tasks")).body as { id: number; type: string }[];
       expect(mine.find((t) => t.id === res.body.taskId)?.type).toBe("spot_check");
     } finally {
       await api.close();

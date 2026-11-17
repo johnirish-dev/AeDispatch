@@ -1,4 +1,6 @@
+import { randomBytes } from "node:crypto";
 import type { Db } from "../connection";
+import { hashToken } from "../security";
 
 export interface StaffUser {
   id: number;
@@ -42,7 +44,7 @@ export function findStaffByUsername(db: Db, username: string): StaffUser | undef
 
 export function createBhw(
   db: Db,
-  b: { displayName: string; barangayId: number; teamLabel?: string; tokenHash: string },
+  b: { displayName: string; barangayId: number; teamLabel?: string; tokenHash?: string },
   at: string = now(),
 ): number {
   const info = db
@@ -50,7 +52,8 @@ export function createBhw(
       `INSERT INTO bhw (display_name, barangay_id, team_label, access_token_hash, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?)`,
     )
-    .run(b.displayName, b.barangayId, b.teamLabel ?? null, b.tokenHash, at, at);
+    // The per-person token is not used any more (the barangay has the token); the column still needs a unique value.
+    .run(b.displayName, b.barangayId, b.teamLabel ?? null, b.tokenHash ?? hashToken(randomBytes(16).toString("hex")), at, at);
   return Number(info.lastInsertRowid);
 }
 
@@ -58,11 +61,38 @@ function toBhw(r: { id: number; display_name: string; barangay_id: number; team_
   return { id: r.id, displayName: r.display_name, barangayId: r.barangay_id, teamLabel: r.team_label };
 }
 
-export function findBhwByTokenHash(db: Db, tokenHash: string): Bhw | undefined {
-  const r = db.prepare("SELECT * FROM bhw WHERE access_token_hash = ?").get(tokenHash) as
-    | { id: number; display_name: string; barangay_id: number; team_label: string | null }
-    | undefined;
+/** Gives the barangay its access token (stored as a hash). Replaces an earlier one. */
+export function setBarangayToken(db: Db, barangayId: number, tokenHash: string, at: string = now()): void {
+  db.prepare(
+    `INSERT INTO barangay_access (barangay_id, access_token_hash, created_at) VALUES (?, ?, ?)
+     ON CONFLICT(barangay_id) DO UPDATE SET access_token_hash = excluded.access_token_hash, created_at = excluded.created_at`,
+  ).run(barangayId, tokenHash, at);
+}
+
+/** The barangay a token opens, if any. */
+export function findBarangayIdByTokenHash(db: Db, tokenHash: string): number | undefined {
+  const r = db.prepare("SELECT barangay_id FROM barangay_access WHERE access_token_hash = ?").get(tokenHash) as { barangay_id: number } | undefined;
+  return r?.barangay_id;
+}
+
+/** Whether this barangay's token is exactly this hash (the Demo tools page uses it to show only working links). */
+export function barangayTokenMatches(db: Db, barangayId: number, tokenHash: string): boolean {
+  return db.prepare("SELECT 1 AS ok FROM barangay_access WHERE barangay_id = ? AND access_token_hash = ?").get(barangayId, tokenHash) !== undefined;
+}
+
+export function getBhw(db: Db, id: number): Bhw | undefined {
+  const r = db.prepare("SELECT * FROM bhw WHERE id = ?").get(id) as { id: number; display_name: string; barangay_id: number; team_label: string | null } | undefined;
   return r ? toBhw(r) : undefined;
+}
+
+export function listBhwsOfBarangay(db: Db, barangayId: number): Bhw[] {
+  const rows = db.prepare("SELECT * FROM bhw WHERE barangay_id = ? ORDER BY display_name").all(barangayId) as {
+    id: number;
+    display_name: string;
+    barangay_id: number;
+    team_label: string | null;
+  }[];
+  return rows.map(toBhw);
 }
 
 export function listBhws(db: Db): Bhw[] {

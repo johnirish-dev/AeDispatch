@@ -30,7 +30,7 @@ describe("migration 002", () => {
     const db = openDatabase(":memory:");
     runMigrations(db, [MIGRATIONS[0]]);
     expect(() => count(db, "anonymous_answer_count")).toThrow();
-    expect(runMigrations(db)).toEqual(["002_anonymous_answers"]);
+    expect(runMigrations(db)).toEqual(["002_anonymous_answers", "003_barangay_access"]);
     expect(count(db, "anonymous_answer_count")).toBe(0);
   });
 });

@@ -13,10 +13,10 @@ import { insertScore, latestScoreFor, latestScores, scoreHistory } from "../src/
 import {
   deleteSimulatedWeather, getWeatherSeries, latestWeatherDate, upsertWeather,
 } from "../src/db/repositories/signalRepo";
-import { createBhw, createStaff, findBhwByTokenHash, findStaffByUsername } from "../src/db/repositories/userRepo";
+import { createBhw, createStaff, findBarangayIdByTokenHash, findStaffByUsername, getBhw, listBhwsOfBarangay, setBarangayToken } from "../src/db/repositories/userRepo";
 import {
   addEvent, countAlertsSince, createRecommendation, createTask, decideRecommendation, insertAlert, insertSurvey,
-  listEvents, listTasksForBhw, updateTaskStatus,
+  listEvents, listTasksForBarangay, updateTaskStatus,
 } from "../src/db/repositories/workflowRepo";
 import { hashPassword, hashToken, verifyPassword } from "../src/db/security";
 import { count, emptyDb } from "./helpers";
@@ -234,14 +234,27 @@ describe("users and security", () => {
     expect(hashPassword("demo1234", "00".repeat(16))).toBe(hashPassword("demo1234", "00".repeat(16)));
   });
 
-  it("finds staff by username and BHWs by token hash", () => {
+  it("finds staff by username, and a barangay by its token hash", () => {
     const { db, a } = twoBarangays();
     createStaff(db, { username: "officer", displayName: "O", passwordHash: hashPassword("pw") });
     expect(findStaffByUsername(db, "officer")!.displayName).toBe("O");
     expect(findStaffByUsername(db, "nobody")).toBeUndefined();
-    createBhw(db, { displayName: "H", barangayId: a, teamLabel: "Team A", tokenHash: hashToken("secret") });
-    expect(findBhwByTokenHash(db, hashToken("secret"))!.barangayId).toBe(a);
-    expect(findBhwByTokenHash(db, hashToken("other"))).toBeUndefined();
+    setBarangayToken(db, a, hashToken("secret"));
+    expect(findBarangayIdByTokenHash(db, hashToken("secret"))).toBe(a);
+    expect(findBarangayIdByTokenHash(db, hashToken("other"))).toBeUndefined();
+    setBarangayToken(db, a, hashToken("newer")); // a new token replaces the old one
+    expect(findBarangayIdByTokenHash(db, hashToken("secret"))).toBeUndefined();
+    expect(findBarangayIdByTokenHash(db, hashToken("newer"))).toBe(a);
+  });
+
+  it("registers BHWs without a token of their own and lists them by barangay", () => {
+    const { db, a, b } = twoBarangays();
+    const h1 = createBhw(db, { displayName: "Zed", barangayId: a });
+    createBhw(db, { displayName: "Abe", barangayId: a });
+    createBhw(db, { displayName: "Other", barangayId: b });
+    expect(listBhwsOfBarangay(db, a).map((x) => x.displayName)).toEqual(["Abe", "Zed"]);
+    expect(getBhw(db, h1)!.displayName).toBe("Zed");
+    expect(getBhw(db, 9999)).toBeUndefined();
   });
 });
 
@@ -265,9 +278,9 @@ describe("workflow", () => {
     expect(decideRecommendation(db, { id: rec, status: "rejected", officerId: officer, reason: "changed my mind" })).toBe(false);
 
     const task = createTask(db, { recommendationId: rec, barangayId: a, bhwId: bhw, type: "search_and_destroy", puroks: ["Purok 1"] });
-    expect(listTasksForBhw(db, bhw)[0]).toMatchObject({ id: task, status: "new", puroks: ["Purok 1"] });
+    expect(listTasksForBarangay(db, a)[0]).toMatchObject({ id: task, status: "new", puroks: ["Purok 1"] });
     expect(updateTaskStatus(db, task, "completed")).toBe(true);
-    expect(listTasksForBhw(db, bhw)[0].status).toBe("completed");
+    expect(listTasksForBarangay(db, a)[0].status).toBe("completed");
     expect(updateTaskStatus(db, 999, "completed")).toBe(false);
   });
 

@@ -4,8 +4,8 @@ import { getActiveParameters } from "../src/db/repositories/parameterRepo";
 import { listBarangays } from "../src/db/repositories/barangayRepo";
 import { purokCases } from "../src/db/repositories/caseRepo";
 import { surveyTotals, getWeatherSeries } from "../src/db/repositories/signalRepo";
-import { findBhwByTokenHash, findStaffByUsername } from "../src/db/repositories/userRepo";
-import { listEvents, listTasksForBhw } from "../src/db/repositories/workflowRepo";
+import { findBarangayIdByTokenHash, findStaffByUsername } from "../src/db/repositories/userRepo";
+import { listEvents, listTasksForBarangay } from "../src/db/repositories/workflowRepo";
 import { hashToken, verifyPassword } from "../src/db/security";
 import { DEFAULT_PARAMETERS } from "../src/algorithms/parameters";
 import { SAMPLE_BARANGAYS } from "../src/db/sampleData";
@@ -48,15 +48,17 @@ describe("seed", () => {
     expect(officer.passwordHash).not.toContain(OFFICER_PASSWORD);
   });
 
-  it("gives each BHW a working token link, stored only as a hash", () => {
+  it("gives each barangay one working token, stored only as a hash", () => {
     const db = emptyDb();
     const summary = seedDatabase(db, { anchorDate: SEED_DATE });
-    expect(summary.bhwTokens).toHaveLength(8);
-    for (const t of summary.bhwTokens) {
-      expect(findBhwByTokenHash(db, hashToken(t.token))!.displayName).toBe(t.name);
-      const stored = JSON.stringify(db.prepare("SELECT access_token_hash FROM bhw").all());
+    expect(summary.barangayTokens).toHaveLength(8);
+    const stored = JSON.stringify(db.prepare("SELECT access_token_hash FROM barangay_access").all());
+    for (const t of summary.barangayTokens) {
+      const barangayId = findBarangayIdByTokenHash(db, hashToken(t.token))!;
+      expect((db.prepare("SELECT name FROM barangay WHERE id = ?").get(barangayId) as { name: string }).name).toBe(t.barangay);
       expect(stored).not.toContain(t.token);
     }
+    expect(new Set(summary.barangayTokens.map((t) => t.token)).size).toBe(8); // all different
   });
 
   it("stores residents only as hashed phone numbers", () => {
@@ -97,7 +99,7 @@ describe("seed", () => {
 
     const taskStatuses = (db.prepare("SELECT status FROM field_task ORDER BY id").all() as { status: string }[]).map((r) => r.status);
     expect(taskStatuses.sort()).toEqual(["completed", "in_progress", "new"]);
-    expect(listTasksForBhw(db, 1).length).toBeGreaterThanOrEqual(1);
+    expect(listTasksForBarangay(db, 1).length).toBeGreaterThanOrEqual(1);
     expect(listEvents(db, 100).map((e) => e.type)).toContain("submission");
   });
 

@@ -6,6 +6,7 @@ import { errorHandler, notFound } from "./api/http";
 import { activityRoutes } from "./api/officer/activity";
 import { barangayRoutes } from "./api/officer/barangays";
 import { caseRoutes } from "./api/officer/cases";
+import { demoRoutes } from "./api/officer/demo";
 import { evaluationRoutes } from "./api/officer/evaluation";
 import { rankingRoutes } from "./api/officer/ranking";
 import { bhwRoutes } from "./api/bhw";
@@ -24,7 +25,7 @@ export function createApp(deps?: AppDeps) {
   if (deps) {
     app.use("/api/auth", authRoutes(deps.db, deps.sessions));
     // Officer routes need the signed-in session; BHW routes need a valid token.
-    app.use("/api/officer", requireOfficer(deps.sessions), rankingRoutes(deps), caseRoutes(deps), barangayRoutes(deps), activityRoutes(deps), evaluationRoutes());
+    app.use("/api/officer", requireOfficer(deps.sessions), rankingRoutes(deps), caseRoutes(deps), barangayRoutes(deps), activityRoutes(deps), evaluationRoutes(), demoRoutes(deps));
     app.use("/api/bhw", requireBhw(deps.db), bhwRoutes(deps));
     // Residents: mostly open (risk level, daily question, symptom check); the report needs the PIN sign-in.
     app.use("/api/resident", residentRoutes(deps));

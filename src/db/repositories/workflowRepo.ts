@@ -81,14 +81,14 @@ export function createTask(
   return Number(info.lastInsertRowid);
 }
 
-export function listTasksForBhw(db: Db, bhwId: number) {
+export function listTasksForBarangay(db: Db, barangayId: number) {
   const rows = db
     .prepare(
       `SELECT id, recommendation_id AS recommendationId, barangay_id AS barangayId, type, puroks, status,
               created_at AS createdAt
-       FROM field_task WHERE bhw_id = ? ORDER BY id DESC`,
+       FROM field_task WHERE barangay_id = ? ORDER BY id DESC`,
     )
-    .all(bhwId) as {
+    .all(barangayId) as {
     id: number;
     recommendationId: number | null;
     barangayId: number;

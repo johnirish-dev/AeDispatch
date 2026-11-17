@@ -4,7 +4,7 @@ import { getBarangay, listBarangays } from "../src/db/repositories/barangayRepo"
 import { latestScoreFor, latestScores } from "../src/db/repositories/scoreRepo";
 import { listEvents } from "../src/db/repositories/workflowRepo";
 import { hashPhone } from "../src/db/security";
-import { listBhws } from "../src/db/repositories/userRepo";
+import { createBhw, listBhws } from "../src/db/repositories/userRepo";
 import { AppError } from "../src/errors";
 import { DataChanges } from "../src/services/changes";
 import { RankingService } from "../src/services/ranking";
@@ -169,7 +169,7 @@ describe("BHW survey", () => {
         headOfFamily: "Secret Name",
         age: 41,
         sex: "Female",
-        surveyedBy: bhw.displayName,
+        interviewerId: bhw.id,
         surveyDate: ANCHOR,
         noContainersFound: false,
         containers: [{ location: "natural", containerType: "Jar", total: 50, withCover: 0, withoutCover: 50, positive: 45, larvaeCount: 100, pupaeCount: 5 }],
@@ -182,7 +182,7 @@ describe("BHW survey", () => {
     const { db, changes } = setup();
     const { bhw, body } = survey(db);
     const before = scoreOf(db, bhw.barangayId);
-    const { surveyId } = changes.submitSurvey(bhw, body);
+    const { surveyId } = changes.submitSurvey(bhw.barangayId, body);
     expect(surveyId).toBeGreaterThan(0);
     expect(scoreOf(db, bhw.barangayId)).toBeGreaterThan(before);
     const event = listEvents(db, 1)[0];
@@ -194,15 +194,44 @@ describe("BHW survey", () => {
     expect(saved.location).toBe("natural");
   });
 
+  it("the interviewer is chosen on the form: any BHW of the barangay can be named, and is the one recorded", () => {
+    const { db, changes } = setup();
+    const { bhw, body } = survey(db);
+    const second = createBhw(db, { displayName: "Second Worker", barangayId: bhw.barangayId });
+    const { surveyId } = changes.submitSurvey(bhw.barangayId, { ...body, interviewerId: second });
+    const saved = db.prepare("SELECT bhw_id AS bhwId, surveyed_by AS by FROM entomological_survey WHERE id = ?").get(surveyId) as { bhwId: number; by: string };
+    expect(saved).toEqual({ bhwId: second, by: "Second Worker" });
+    expect(listEvents(db, 1)[0].text).toContain("Second Worker");
+  });
+
+  it.each([
+    ["no interviewer", undefined],
+    ["an interviewer that does not exist", 99999],
+    ["not a number", "Rico"],
+  ])("rejects %s, and saves nothing", (_label, interviewerId) => {
+    const { db, changes } = setup();
+    const { bhw, body } = survey(db);
+    const surveys = count(db, "entomological_survey");
+    expect(() => changes.submitSurvey(bhw.barangayId, { ...body, interviewerId })).toThrow();
+    expect(count(db, "entomological_survey")).toBe(surveys);
+  });
+
+  it("rejects an interviewer who belongs to another barangay", () => {
+    const { db, changes } = setup();
+    const { bhw, body } = survey(db);
+    const jun = bhwOf(db, "Jun M. Santos"); // Peñafrancia, not Mabini
+    expectError(() => changes.submitSurvey(bhw.barangayId, { ...body, interviewerId: jun.id }), 400, /list of this barangay/);
+  });
+
   it("marks the task in progress, or completed when the BHW says so", () => {
     const { db, changes } = setup();
     const jun = bhwOf(db, "Jun M. Santos");
     const taskId = (db.prepare("SELECT id FROM field_task WHERE bhw_id = ? AND status = 'new'").get(jun.id) as { id: number }).id;
     const purokId = getBarangay(db, jun.barangayId)!.puroks[0].id;
-    const base = { purokId, houseNo: "3", surveyedBy: jun.displayName, surveyDate: ANCHOR, noContainersFound: true, taskId };
-    changes.submitSurvey(jun, base);
+    const base = { purokId, houseNo: "3", interviewerId: jun.id, surveyDate: ANCHOR, noContainersFound: true, taskId };
+    changes.submitSurvey(jun.barangayId, base);
     expect((db.prepare("SELECT status FROM field_task WHERE id = ?").get(taskId) as { status: string }).status).toBe("in_progress");
-    changes.submitSurvey(jun, { ...base, houseNo: "4", completeTask: true });
+    changes.submitSurvey(jun.barangayId, { ...base, houseNo: "4", completeTask: true });
     expect((db.prepare("SELECT status FROM field_task WHERE id = ?").get(taskId) as { status: string }).status).toBe("completed");
   });
 
@@ -220,18 +249,18 @@ describe("BHW survey", () => {
     const { bhw, body } = survey(db, extra as Record<string, unknown>);
     const surveys = count(db, "entomological_survey");
     const scores = count(db, "threat_score");
-    expectError(() => changes.submitSurvey(bhw, body), 400, message);
+    expectError(() => changes.submitSurvey(bhw.barangayId, body), 400, message);
     expect(count(db, "entomological_survey")).toBe(surveys);
     expect(count(db, "threat_score")).toBe(scores);
   });
 
-  it("rejects a purok from another barangay and a task assigned to someone else", () => {
+  it("rejects a purok or a task from another barangay", () => {
     const { db, changes } = setup();
     const { bhw, body } = survey(db);
     const otherPurok = getBarangay(db, idOf(db, "Tagas"))!.puroks[0].id;
-    expectError(() => changes.submitSurvey(bhw, { ...body, purokId: otherPurok }), 400, /not in your barangay/);
+    expectError(() => changes.submitSurvey(bhw.barangayId, { ...body, purokId: otherPurok }), 400, /not in your barangay/);
     const juns = (db.prepare("SELECT id FROM field_task WHERE bhw_id = ?").get(bhwOf(db, "Jun M. Santos").id) as { id: number }).id;
-    expectError(() => changes.submitSurvey(bhw, { ...body, taskId: juns }), 400, /not assigned to you/);
+    expectError(() => changes.submitSurvey(bhw.barangayId, { ...body, taskId: juns }), 400, /not assigned to your barangay/);
   });
 });
 
