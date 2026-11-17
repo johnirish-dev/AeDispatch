@@ -4,6 +4,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { AblationReport, SmoothingReport, ablationCsv, smoothingCsv } from "./ablation";
 import { PerformanceReport, performanceCsv } from "./performance";
 import { QualityReport, qualityCsv } from "./quality";
 import { RobustnessReport, robustnessCsv } from "./robustness";
@@ -22,6 +23,10 @@ export interface EvaluationFile {
   robustness?: RobustnessReport;
   /** How the early-warning result changes when the simulator's assumptions are weakened. */
   sensitivity?: SensitivityReport;
+  /** What each of the five sources adds to the ranking (Objective 1). */
+  ablation?: AblationReport;
+  /** Whether smoothing makes the ranking steadier and no worse when counts are small (Objective 1). */
+  smoothing?: SmoothingReport;
   /** Tier 1, the capacity curve and Tier 2 (Objective 2). */
   tiers?: TierReport;
   /** The Max Heap against re-sorting the whole list, measured on the machine named inside it (Objective 4). */
@@ -40,6 +45,8 @@ export function writeReports(outDir: string, file: EvaluationFile): void {
   fs.writeFileSync(path.join(outDir, "quality.csv"), qualityCsv(file.quality));
   if (file.robustness) fs.writeFileSync(path.join(outDir, "robustness.csv"), robustnessCsv(file.robustness));
   if (file.sensitivity) fs.writeFileSync(path.join(outDir, "sensitivity.csv"), sensitivityCsv(file.sensitivity));
+  if (file.ablation) fs.writeFileSync(path.join(outDir, "ablation.csv"), ablationCsv(file.ablation));
+  if (file.smoothing) fs.writeFileSync(path.join(outDir, "smoothing.csv"), smoothingCsv(file.smoothing));
   if (file.tiers) {
     fs.writeFileSync(path.join(outDir, "tiers.csv"), tiersCsv(file.tiers));
     fs.writeFileSync(path.join(outDir, "capacity.csv"), capacityCsv(file.tiers));

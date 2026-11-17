@@ -3,6 +3,7 @@
 // (git-ignored): evaluation.json (what the Demo tools page reads) and CSV files, all from the
 // same saved object. Same seeds give the same numbers; only timings differ between runs.
 
+import { AblationOptions, SmoothingOptions, formatAblation, formatSmoothing, runAblation, runSmoothing } from "./ablation";
 import { PerformanceOptions, formatPerformance, runPerformance } from "./performance";
 import { QualityOptions, formatQuality, runQuality } from "./quality";
 import { EvaluationFile, reportsDir, writeReports } from "./reports";
@@ -21,6 +22,14 @@ const quality: QualityOptions = quick
 const stress: RobustnessOptions & SensitivityOptions = quick
   ? { barangays: 100, weeks: 14, seeds: [1, 2, 3], k: 5, randomShuffles: 30 }
   : { barangays: 360, weeks: 24, seeds: Array.from({ length: 10 }, (_, i) => i + 1), k: 10, randomShuffles: 100 };
+
+// Leave-one-source-out (the same size as the quality run) and the smoothing check (the smaller size of the stress tests).
+const ablationOptions: AblationOptions = quick
+  ? { barangays: 100, weeks: 16, seeds: [1, 2, 3, 4, 5], k: 10 }
+  : { barangays: 720, weeks: 30, seeds: Array.from({ length: 30 }, (_, i) => i + 1), k: 10 };
+const smoothingOptions: SmoothingOptions = quick
+  ? { barangays: 100, weeks: 14, seeds: [1, 2, 3], k: 10, smallShare: 0.2, smallPopulation: 120 }
+  : { barangays: 360, weeks: 24, seeds: Array.from({ length: 10 }, (_, i) => i + 1), k: 10, smallShare: 0.2, smallPopulation: 120 };
 
 // Tier 1, the capacity curve and Tier 2: the same municipality size as the quality run.
 const tierOptions: TierOptions = quick
@@ -49,6 +58,14 @@ function main(): void {
   console.log(formatSensitivity(sensitivity));
 
   console.log("\n" + "-".repeat(100));
+  const ablation = runAblation(ablationOptions);
+  console.log(formatAblation(ablation));
+
+  console.log("\n" + "-".repeat(100));
+  const smoothing = runSmoothing(smoothingOptions);
+  console.log(formatSmoothing(smoothing));
+
+  console.log("\n" + "-".repeat(100));
   const tiers = runTiers(tierOptions);
   console.log(formatTiers(tiers));
 
@@ -56,7 +73,7 @@ function main(): void {
   const timing = runPerformance(timingOptions, (line) => console.log(line));
   console.log(formatPerformance(timing));
 
-  const file: EvaluationFile = { generatedAt: new Date().toISOString(), mode: quick ? "quick" : "full", node: process.version, quality: report, robustness, sensitivity, tiers, performance: timing };
+  const file: EvaluationFile = { generatedAt: new Date().toISOString(), mode: quick ? "quick" : "full", node: process.version, quality: report, robustness, sensitivity, ablation, smoothing, tiers, performance: timing };
   const dir = reportsDir();
   writeReports(dir, file);
 
