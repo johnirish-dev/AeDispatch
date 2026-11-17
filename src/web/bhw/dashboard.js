@@ -26,7 +26,11 @@ async function doSync() {
   syncInProgress = true;
   let sent = 0;
 
-  Store.saveSyncedForm({
+  for (const item of queue) {
+    try {
+      const res = await post('/api/bhw/surveys', item.payload);
+      Store.dequeue(item.id);
+      Store.saveSyncedForm({
         id: `sync-${res?.surveyId || Date.now()}`,
         surveyId: res?.surveyId,
         surveyedAt: Date.now(),
@@ -40,21 +44,6 @@ async function doSync() {
           storeys: item.payload.storeys === 1 ? 'Single storey' : item.payload.storeys === 2 ? '2 or more storeys' : '',
           screening: item.payload.screened === true ? 'Screened' : item.payload.screened === false ? 'Unscreened' : ''
         }
-      });
-
-  for (const item of queue) {
-    try {
-      const res = await post('/api/bhw/surveys', item.payload);
-      Store.dequeue(item.id);
-      Store.saveSyncedForm({
-        id: `sync-${res?.surveyId || Date.now()}`,
-        surveyId: res?.surveyId,
-        surveyedAt: Date.now(),
-        houseNo: item.payload.houseNo,
-        purokId: item.payload.purokId,
-        purokName: item.purokName || `Purok ${item.payload.purokId}`,
-        headOfFamily: item.payload.headOfFamily,
-        containers: item.payload.containers || []
       });
       sent++;
     } catch (err) {
@@ -102,17 +91,19 @@ export async function renderDashboard(root) {
   const queue = Store.getQueue();
   const synced = await Store.fetchServerSurveys();
 
-  const weeklyTarget = 20;
   const submittedCount = synced.length;
-  const weeklyPct = Math.min(100, Math.round((submittedCount / weeklyTarget) * 100));
-  const remainingHouseholds = Math.max(0, weeklyTarget - submittedCount);
-
   const allContainers = [
     ...drafts.flatMap(d => d.form?.containers || []),
     ...queue.flatMap(q => q.payload?.containers || []),
     ...synced.flatMap(s => s.containers || [])
   ];
   const positiveTotal = allContainers.reduce((sum, c) => sum + (Number(c.positive) || 0), 0);
+
+  const openTasks = tasks.filter(t => t.status !== 'completed');
+  const openTask = openTasks[0] || null;
+  const activeTierLabel = openTask
+    ? (openTask.type === 'search_and_destroy' ? 'Tier 1 · Search & destroy' : openTask.type === 'spot_check' ? 'Spot check' : 'Tier 2 review')
+    : 'Field inspection';
 
   const formatNow = () => {
     const d = new Date();
@@ -121,11 +112,6 @@ export async function renderDashboard(root) {
       hour: 'numeric', minute: '2-digit', second: '2-digit'
     });
   };
-
-  const openTask = tasks.find(t => t.status !== 'completed');
-  const activeTierLabel = openTask
-    ? (openTask.type === 'search_and_destroy' ? 'Tier 1' : openTask.type === 'spot_check' ? 'Spot check' : 'Tier 2 review')
-    : 'Spot check';
 
   root.innerHTML = `
     <div class="bhw-topbar">
@@ -138,28 +124,27 @@ export async function renderDashboard(root) {
     </div>
 
     <div class="bhw-progress-strip">
-      <strong>Weekly progress</strong>
-      <span>${submittedCount} of ${weeklyTarget} households surveyed</span>
-      <div class="bhw-progress-track">
-        <div class="bhw-progress-fill" style="width: ${weeklyPct}%;"></div>
+      <div>
+        <strong>Field survey activity</strong>
+        <span style="margin-left:8px;">${submittedCount} household${submittedCount === 1 ? '' : 's'} submitted in Barangay ${me?.barangay?.name || ''}</span>
       </div>
-      <strong>${weeklyPct}%</strong>
+      <span>${openTasks.length > 0 ? `${openTasks.length} active dispatch task(s) from Municipal Health Office` : '14-day active field window'}</span>
     </div>
 
     <div class="bhw-kpi-grid">
       <div class="bhw-kpi-card is-primary">
         <div class="bhw-kpi-top">
           <span>Submitted forms</span>
-          <a href="#/forms" class="bhw-kpi-arrow" aria-label="View submitted forms">${icon('arrowUpRight', 14)}</a>
+          <a href="#/forms" class="bhw-kpi-arrow" title="View submitted forms" aria-label="View submitted forms">${icon('arrowUpRight', 14)}</a>
         </div>
         <div class="bhw-kpi-value">${submittedCount}</div>
-        <div class="bhw-kpi-foot"><span class="bhw-dot green-light"></span> ${weeklyPct}% of weekly target</div>
+        <div class="bhw-kpi-foot"><span class="bhw-dot green-light"></span> Recorded in barangay</div>
       </div>
 
       <div class="bhw-kpi-card">
         <div class="bhw-kpi-top">
           <span>Drafts</span>
-          <a href="#/forms" class="bhw-kpi-arrow" aria-label="View drafts">${icon('arrowUpRight', 14)}</a>
+          <a href="#/forms" class="bhw-kpi-arrow" title="View saved drafts" aria-label="View drafts">${icon('arrowUpRight', 14)}</a>
         </div>
         <div class="bhw-kpi-value">${drafts.length}</div>
         <div class="bhw-kpi-foot"><span class="bhw-dot amber"></span> Awaiting completion</div>
@@ -168,7 +153,7 @@ export async function renderDashboard(root) {
       <div class="bhw-kpi-card">
         <div class="bhw-kpi-top">
           <span>Positive containers</span>
-          <a href="#/forms" class="bhw-kpi-arrow" aria-label="View positive containers">${icon('arrowUpRight', 14)}</a>
+          <a href="#/forms" class="bhw-kpi-arrow" title="View positive containers" aria-label="View positive containers">${icon('arrowUpRight', 14)}</a>
         </div>
         <div class="bhw-kpi-value">${positiveTotal}</div>
         <div class="bhw-kpi-foot"><span class="bhw-dot red"></span> With larvae or pupae</div>
@@ -177,7 +162,7 @@ export async function renderDashboard(root) {
       <div class="bhw-kpi-card">
         <div class="bhw-kpi-top">
           <span>Waiting to sync</span>
-          <a href="#/forms" class="bhw-kpi-arrow" aria-label="View waiting to sync">${icon('arrowUpRight', 14)}</a>
+          <a href="#/forms" class="bhw-kpi-arrow" title="View pending uploads" aria-label="View waiting to sync">${icon('arrowUpRight', 14)}</a>
         </div>
         <div class="bhw-kpi-value">${queue.length}</div>
         <div class="bhw-kpi-foot"><span class="bhw-dot blue"></span> Pending upload</div>
@@ -188,10 +173,10 @@ export async function renderDashboard(root) {
       <section class="bhw-panel">
         <div class="bhw-panel-header">
           <div>
-            <h2 class="bhw-panel-title">Assigned puroks</h2>
-            <p class="bhw-panel-sub">${remainingHouseholds} households remaining to meet this week's target</p>
+            <h2 class="bhw-panel-title">Barangay puroks</h2>
+            <p class="bhw-panel-sub">Households surveyed per purok during the current field window</p>
           </div>
-          <a href="#/survey" class="bhw-pill-btn primary">${icon('plus', 14)} New household survey</a>
+          <a href="#/survey" class="bhw-pill-btn primary" title="Start a new Dengue Form 5 household survey">${icon('plus', 14)} New household survey</a>
         </div>
         <div id="puroks-list"></div>
       </section>
@@ -202,7 +187,7 @@ export async function renderDashboard(root) {
             <h2 class="bhw-panel-title">Recent forms</h2>
             <p class="bhw-panel-sub">Latest household entries</p>
           </div>
-          <a href="#/forms" class="bhw-pill-btn outline sm">View all</a>
+          <a href="#/forms" class="bhw-pill-btn outline sm" title="View all forms">View all</a>
         </div>
         <div id="recent-forms-list"></div>
       </section>
@@ -216,16 +201,14 @@ export async function renderDashboard(root) {
 
   const puroksList = root.querySelector('#puroks-list');
   const puroks = me?.puroks || [];
-  const targetPerPurok = Math.max(4, Math.ceil(weeklyTarget / Math.max(1, puroks.length)));
 
   puroks.forEach((p, idx) => {
     const surveyedInPurok = synced.filter(s => String(s.purokId) === String(p.id)).length;
-    const pct = Math.min(100, Math.round((surveyedInPurok / targetPerPurok) * 100));
-    const statusLabel = surveyedInPurok >= targetPerPurok
-      ? 'Completed'
-      : surveyedInPurok > 0 || openTask
-        ? 'In progress'
-        : 'Not started';
+    const queuedInPurok = queue.filter(q => String(q.payload?.purokId) === String(p.id)).length;
+    const totalRecorded = surveyedInPurok + queuedInPurok;
+
+    const statusLabel = totalRecorded > 0 ? `${totalRecorded} surveyed` : (openTask ? 'In progress' : 'Not started');
+    const badgeClass = totalRecorded > 0 ? 'synced' : 'in-progress';
 
     const row = document.createElement('div');
     row.className = 'bhw-purok-row';
@@ -235,14 +218,10 @@ export async function renderDashboard(root) {
         <div class="bhw-num-circle">${idx + 1}</div>
         <div>
           <strong style="font-size:14px; display:block;">${p.name}</strong>
-          <span style="font-size:12px; color:#6B7280;">${activeTierLabel} · ${surveyedInPurok} of ${targetPerPurok} surveyed</span>
+          <span style="font-size:12px; color:#6B7280;">${activeTierLabel} · ${totalRecorded} household${totalRecorded === 1 ? '' : 's'} recorded</span>
         </div>
       </div>
-      <div class="bhw-purok-bar-wrap">
-        <div class="bhw-progress-track"><div class="bhw-progress-fill" style="width:${pct}%"></div></div>
-        <strong style="font-size:12px;">${pct}%</strong>
-      </div>
-      <span class="bhw-status-badge in-progress">${statusLabel}</span>
+      <span class="bhw-status-badge ${badgeClass}">${statusLabel}</span>
     `;
     puroksList.appendChild(row);
   });
