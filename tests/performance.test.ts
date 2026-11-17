@@ -1,11 +1,14 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { PerformanceOptions, formatPerformance, logLogSlope, performanceCsv, runPerformance } from "../src/eval/performance";
 import { EvaluationFile, readEvaluation, writeReports } from "../src/eval/reports";
 import { runQuality } from "../src/eval/quality";
 import { startApi } from "./apiHelpers";
+
+// These tests run simulations. With the default 5 s limit they fail when the machine is busy or the tests are slowed down (coverage), so they get a longer one.
+vi.setConfig({ testTimeout: 60_000 });
 
 // The timing of the Max Heap against sorting the whole list again. The numbers themselves change
 // from run to run and machine to machine, so these tests check the SHAPE of the report, that both

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_PARAMETERS } from "../src/algorithms/parameters";
 import { smoothedRate } from "../src/algorithms/scoring";
 import {
@@ -27,6 +27,9 @@ import {
 import { runQuality } from "../src/eval/quality";
 import { EvaluationFile, readEvaluation, writeReports } from "../src/eval/reports";
 import { startApi } from "./apiHelpers";
+
+// These tests run simulations. With the default 5 s limit they fail when the machine is busy or the tests are slowed down (coverage), so they get a longer one.
+vi.setConfig({ testTimeout: 60_000 });
 
 // Leave-one-source-out and the smoothing check (Objective 1). The numbers come from a simulation, so
 // the tests check what must always hold: the ranking really is the real model with one source

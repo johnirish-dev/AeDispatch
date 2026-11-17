@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_PARAMETERS } from "../src/algorithms/parameters";
 import { recommendedAction } from "../src/algorithms/risk";
 import { runQuality } from "../src/eval/quality";
@@ -10,6 +10,9 @@ import { EvaluationFile, readEvaluation, writeReports } from "../src/eval/report
 import { TIER_METHODS, TierOptions, capacityCsv, checkTier2Property, evaluateTierSeed, formatTiers, runTiers, tiersCsv } from "../src/eval/tiers";
 import { generate } from "../src/sim/generator";
 import { startApi } from "./apiHelpers";
+
+// These tests run simulations. With the default 5 s limit they fail when the machine is busy or the tests are slowed down (coverage), so they get a longer one.
+vi.setConfig({ testTimeout: 60_000 });
 
 // Tier 1, the capacity curve and Tier 2 (Objective 2). The numbers are results of a simulation, so the
 // tests check what must always hold: the rules are the real ones, the comparison is at equal

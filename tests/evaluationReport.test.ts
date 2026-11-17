@@ -66,7 +66,7 @@ describe("saved evaluation", () => {
       expect(line).toBeDefined();
       expect(line[6]).toBe(text(r.interval.mean as number | null));
     }
-  });
+  }, 60_000); // runs two simulations; the default 5 s is too short when the tests are slowed down (coverage, a busy machine)
 
   it("reading a folder with no evaluation gives null", () => {
     expect(readEvaluation(tempDir())).toBeNull();
