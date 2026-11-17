@@ -4,6 +4,7 @@
 // same saved object. Same seeds give the same numbers; only timings differ between runs.
 
 import { AblationOptions, SmoothingOptions, formatAblation, formatSmoothing, runAblation, runSmoothing } from "./ablation";
+import { FairnessOptions, formatFairness, runFairness } from "./fairness";
 import { PerformanceOptions, formatPerformance, runPerformance } from "./performance";
 import { QualityOptions, formatQuality, runQuality } from "./quality";
 import { EvaluationFile, reportsDir, writeReports } from "./reports";
@@ -30,6 +31,11 @@ const ablationOptions: AblationOptions = quick
 const smoothingOptions: SmoothingOptions = quick
   ? { barangays: 100, weeks: 14, seeds: [1, 2, 3], k: 10, smallShare: 0.2, smallPopulation: 120 }
   : { barangays: 360, weeks: 24, seeds: Array.from({ length: 10 }, (_, i) => i + 1), k: 10, smallShare: 0.2, smallPopulation: 120 };
+
+// Fairness by group: barangays by size, and by how much they report (30 percent report a quarter as much in the uneven run).
+const fairnessOptions: FairnessOptions = quick
+  ? { barangays: 100, weeks: 16, seeds: [1, 2, 3, 4, 5], ks: [10], lowReportingShare: 0.3, lowReportingRate: 0.25, randomShuffles: 10 }
+  : { barangays: 720, weeks: 30, seeds: Array.from({ length: 30 }, (_, i) => i + 1), ks: [10, 20], lowReportingShare: 0.3, lowReportingRate: 0.25, randomShuffles: 20 };
 
 // Tier 1, the capacity curve and Tier 2: the same municipality size as the quality run.
 const tierOptions: TierOptions = quick
@@ -66,6 +72,10 @@ function main(): void {
   console.log(formatSmoothing(smoothing));
 
   console.log("\n" + "-".repeat(100));
+  const fairness = runFairness(fairnessOptions);
+  console.log(formatFairness(fairness));
+
+  console.log("\n" + "-".repeat(100));
   const tiers = runTiers(tierOptions);
   console.log(formatTiers(tiers));
 
@@ -73,7 +83,7 @@ function main(): void {
   const timing = runPerformance(timingOptions, (line) => console.log(line));
   console.log(formatPerformance(timing));
 
-  const file: EvaluationFile = { generatedAt: new Date().toISOString(), mode: quick ? "quick" : "full", node: process.version, quality: report, robustness, sensitivity, ablation, smoothing, tiers, performance: timing };
+  const file: EvaluationFile = { generatedAt: new Date().toISOString(), mode: quick ? "quick" : "full", node: process.version, quality: report, robustness, sensitivity, fairness, ablation, smoothing, tiers, performance: timing };
   const dir = reportsDir();
   writeReports(dir, file);
 

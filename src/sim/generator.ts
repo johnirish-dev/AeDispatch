@@ -20,6 +20,13 @@ export interface SimOverride {
   caseOnsetWeek?: number | null;
   /** Purok index (0-based) that carries most of an outbreak's cases. */
   hotPurok?: number;
+  /**
+   * Share of the usual household answers, household reports and symptom checks this barangay sends,
+   * above 0 and at most 1 (0.25 = a quarter as many). Omit for 1. The usual counts are generated first
+   * and then thinned, so the rest of the data stay exactly as they were. Used to test fairness towards
+   * barangays that report little.
+   */
+  reportingRate?: number;
 }
 
 export interface SimOptions {
@@ -39,6 +46,15 @@ export interface SimOptions {
   /** Week index where the two-week wet and warm spell starts. Default: random. */
   spellWeek?: number;
   overrides?: SimOverride[];
+  /**
+   * Share of the barangays (chosen at random) that report at `lowReportingRate` of the usual volume.
+   * Default 0: every barangay reports as usual, and the generated data are exactly what they were before
+   * this option existed. When it is on, the municipality itself (populations, outbreaks, cases, surveys,
+   * weather) is identical to the same seed without it; only the resident reports of those barangays are fewer.
+   */
+  lowReportingShare?: number;
+  /** The reporting volume of those barangays, as a share of the usual. Default 0.25. */
+  lowReportingRate?: number;
 }
 
 export interface SimData {
@@ -50,6 +66,8 @@ export interface SimData {
   purokCount: Uint8Array;
   /** Case-onset week per barangay, -1 when there is no outbreak. */
   onsetWeek: Int16Array;
+  /** Share of the usual reporting volume each barangay sends (1 for all unless the options say otherwise). */
+  reportingRate: Float32Array;
   hotPurok: Uint8Array;
   /** Municipal weather, one value per day. */
   meanTempC: Float32Array;
@@ -112,6 +130,7 @@ export function generate(opts: SimOptions): SimData {
     areaKm2: new Float32Array(n),
     purokCount: new Uint8Array(n),
     onsetWeek: new Int16Array(n).fill(-1),
+    reportingRate: new Float32Array(n).fill(1),
     hotPurok: new Uint8Array(n),
     meanTempC: new Float32Array(days),
     rainfallMm: new Float32Array(days),
@@ -131,6 +150,12 @@ export function generate(opts: SimOptions): SimData {
   const spellWeek = opts.spellWeek ?? drawnSpell;
   generateWeather(rng, days, opts.startDayOfYear ?? 200, spellWeek, d.meanTempC, d.rainfallMm);
 
+  // Which barangays report little. Chosen from a stream of its own, so the main stream (and with it the
+  // rest of the data) is untouched.
+  const lowShare = opts.lowReportingShare ?? 0;
+  const lowRate = opts.lowReportingRate ?? 0.25;
+  const lowBarangays = lowShare > 0 ? lowReportingBarangays(opts.seed, n, lowShare) : new Set<number>();
+
   for (let b = 0; b < n; b++) {
     const o = opts.overrides?.[b] ?? {};
     const population = o.population ?? Math.round(800 + 11000 * rng() ** 2);
@@ -149,6 +174,7 @@ export function generate(opts: SimOptions): SimData {
     d.onsetWeek[b] = onset;
 
     const bias = 0.8 + 0.4 * rng(); // some barangays are simply more active
+    d.reportingRate[b] = o.reportingRate ?? (lowBarangays.has(b) ? lowRate : 1);
     for (let w = 0; w < weeks; w++) {
       // 0 until `lead` weeks before onset, then rises to 1 at onset (a step when lead is 0).
       const ramp = onset < 0 ? 0 : lead === 0 ? (w >= onset ? 1 : 0) : clamp01((w - (onset - lead)) / lead);
@@ -186,5 +212,49 @@ export function generate(opts: SimOptions): SimData {
       }
     }
   }
+  thinLowReporters(d, opts.seed);
   return d;
+}
+
+/**
+ * Barangays that report less send only a share of the household answers, household reports and symptom
+ * checks the usual counts would give. Done after the main generation, from a stream of its own, so every
+ * other number of the municipality is exactly what it would have been.
+ */
+/**
+ * The barangays that would report little when `share` of the barangays do (the same choice `generate` makes with
+ * the `lowReportingShare` option). Exported so an evaluation can name the same barangays in a run where they
+ * report as usual: the control that shows what the low reporting itself costs.
+ */
+export function lowReportingBarangays(seed: number, n: number, share: number): Set<number> {
+  const pick = mulberry32(seed * 7907 + 3);
+  const order = Array.from({ length: n }, (_, i) => i);
+  for (let i = n - 1; i > 0; i--) {
+    const j = Math.floor(pick() * (i + 1));
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+  return new Set(order.slice(0, Math.round(n * share)));
+}
+
+function thinLowReporters(d: SimData, seed: number): void {
+  const rng = mulberry32(seed * 6151 + 11);
+  for (let b = 0; b < d.barangays; b++) {
+    const rate = d.reportingRate[b];
+    if (rate >= 1) continue;
+    for (let k = 0; k < d.days; k++) {
+      const i = b * d.days + k;
+      const answers = d.answersTotal[i];
+      const keptAnswers = binomial(rng, answers, rate);
+      d.answersYes[i] = answers === 0 ? 0 : Math.round((d.answersYes[i] * keptAnswers) / answers);
+      d.answersTotal[i] = keptAnswers;
+      const reports = d.reportsTotal[i];
+      const keptReports = binomial(rng, reports, rate);
+      d.reportsWithBreeding[i] = reports === 0 ? 0 : Math.round((d.reportsWithBreeding[i] * keptReports) / reports);
+      d.reportsTotal[i] = keptReports;
+      const checks = d.symptomChecks[i];
+      const keptChecks = binomial(rng, checks, rate);
+      d.symptomWarning[i] = checks === 0 ? 0 : Math.round((d.symptomWarning[i] * keptChecks) / checks);
+      d.symptomChecks[i] = keptChecks;
+    }
+  }
 }

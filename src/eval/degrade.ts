@@ -14,6 +14,7 @@ export function cloneSim(d: SimData): SimData {
     areaKm2: d.areaKm2.slice(),
     purokCount: d.purokCount.slice(),
     onsetWeek: d.onsetWeek.slice(),
+    reportingRate: d.reportingRate.slice(),
     hotPurok: d.hotPurok.slice(),
     meanTempC: d.meanTempC.slice(),
     rainfallMm: d.rainfallMm.slice(),

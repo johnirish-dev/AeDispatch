@@ -5,6 +5,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { AblationReport, SmoothingReport, ablationCsv, smoothingCsv } from "./ablation";
+import { FairnessReport, fairnessCsv } from "./fairness";
 import { PerformanceReport, performanceCsv } from "./performance";
 import { QualityReport, qualityCsv } from "./quality";
 import { RobustnessReport, robustnessCsv } from "./robustness";
@@ -23,6 +24,8 @@ export interface EvaluationFile {
   robustness?: RobustnessReport;
   /** How the early-warning result changes when the simulator's assumptions are weakened. */
   sensitivity?: SensitivityReport;
+  /** Whether barangays that are small, or that report little, are left behind (Objective 3). */
+  fairness?: FairnessReport;
   /** What each of the five sources adds to the ranking (Objective 1). */
   ablation?: AblationReport;
   /** Whether smoothing makes the ranking steadier and no worse when counts are small (Objective 1). */
@@ -45,6 +48,7 @@ export function writeReports(outDir: string, file: EvaluationFile): void {
   fs.writeFileSync(path.join(outDir, "quality.csv"), qualityCsv(file.quality));
   if (file.robustness) fs.writeFileSync(path.join(outDir, "robustness.csv"), robustnessCsv(file.robustness));
   if (file.sensitivity) fs.writeFileSync(path.join(outDir, "sensitivity.csv"), sensitivityCsv(file.sensitivity));
+  if (file.fairness) fs.writeFileSync(path.join(outDir, "fairness.csv"), fairnessCsv(file.fairness));
   if (file.ablation) fs.writeFileSync(path.join(outDir, "ablation.csv"), ablationCsv(file.ablation));
   if (file.smoothing) fs.writeFileSync(path.join(outDir, "smoothing.csv"), smoothingCsv(file.smoothing));
   if (file.tiers) {
