@@ -1,65 +1,8 @@
-import { get, post } from '../shared/api.js';
+import { get } from '../shared/api.js';
 import { Store } from './store.js';
 import { icon } from './icons.js';
 
 let clockTimer = null;
-let syncInProgress = false;
-
-export function updateSyncBadge() {
-  const count = Store.getQueue().length;
-  const badge = document.getElementById('sync-badge');
-  const mobBadge = document.getElementById('mob-sync-badge');
-  if (badge) {
-    badge.textContent = String(count);
-    badge.style.display = count > 0 ? 'inline-flex' : 'none';
-  }
-  if (mobBadge) {
-    mobBadge.textContent = count > 0 ? `(${count})` : '';
-  }
-}
-
-async function doSync() {
-  if (syncInProgress) return;
-  const queue = Store.getQueue();
-  if (queue.length === 0) return;
-
-  syncInProgress = true;
-  let sent = 0;
-
-  for (const item of queue) {
-    try {
-      const res = await post('/api/bhw/surveys', item.payload);
-      Store.dequeue(item.id);
-      Store.saveSyncedForm({
-        id: `sync-${res?.surveyId || Date.now()}`,
-        surveyId: res?.surveyId,
-        surveyedAt: Date.now(),
-        houseNo: item.payload.houseNo,
-        purokId: item.payload.purokId,
-        purokName: item.purokName || `Purok ${item.payload.purokId}`,
-        headOfFamily: item.payload.headOfFamily,
-        containers: item.payload.containers || [],
-        form: {
-          ...item.payload,
-          storeys: item.payload.storeys === 1 ? 'Single storey' : item.payload.storeys === 2 ? '2 or more storeys' : '',
-          screening: item.payload.screened === true ? 'Screened' : item.payload.screened === false ? 'Unscreened' : ''
-        }
-      });
-      sent++;
-    } catch (err) {
-      item.lastError = err.data?.error || 'Sync failed';
-    }
-  }
-
-  syncInProgress = false;
-  updateSyncBadge();
-  const remaining = Store.getQueue().length;
-  alert(`${sent} sent, ${remaining} still waiting.`);
-  window.dispatchEvent(new Event('hashchange'));
-}
-
-document.getElementById('sync-btn')?.addEventListener('click', doSync);
-document.getElementById('mob-sync-btn')?.addEventListener('click', doSync);
 
 function formatRelativeTime(ts) {
   if (!ts) return '';
@@ -75,7 +18,6 @@ function formatRelativeTime(ts) {
 }
 
 export async function renderDashboard(root) {
-  updateSyncBadge();
   if (clockTimer) clearInterval(clockTimer);
 
   const me = window.bhwContext;
@@ -115,58 +57,40 @@ export async function renderDashboard(root) {
 
   root.innerHTML = `
     <div class="bhw-topbar">
-      <h1 class="bhw-page-title">Dashboard</h1>
+      <div>
+        <h1 class="bhw-page-title">Dashboard</h1>
+        <p class="bhw-page-subtitle">${submittedCount} household${submittedCount === 1 ? '' : 's'} submitted${openTasks.length > 0 ? ` · ${openTasks.length} active task${openTasks.length === 1 ? '' : 's'}` : ''}</p>
+      </div>
       <div class="bhw-clock-pill">
         <span class="bhw-dot-green"></span>
-        ${icon('clock', 14)}
         <span id="live-clock">${formatNow()}</span>
       </div>
     </div>
 
-    <div class="bhw-progress-strip">
-      <div>
-        <strong>Field survey activity</strong>
-        <span style="margin-left:8px;">${submittedCount} household${submittedCount === 1 ? '' : 's'} submitted in Barangay ${me?.barangay?.name || ''}</span>
-      </div>
-      <span>${openTasks.length > 0 ? `${openTasks.length} active dispatch task(s) from Municipal Health Office` : '14-day active field window'}</span>
-    </div>
-
     <div class="bhw-kpi-grid">
-      <div class="bhw-kpi-card is-primary">
-        <div class="bhw-kpi-top">
-          <span>Submitted forms</span>
-          <a href="#/forms" class="bhw-kpi-arrow" title="View submitted forms" aria-label="View submitted forms">${icon('arrowUpRight', 14)}</a>
-        </div>
+      <a class="bhw-kpi" data-kpi="green" href="#/forms/synced" aria-label="Submitted forms: ${submittedCount}. View submitted forms">
+        <span class="bhw-kpi-label">Submitted forms</span>
         <div class="bhw-kpi-value">${submittedCount}</div>
-        <div class="bhw-kpi-foot"><span class="bhw-dot green-light"></span> Recorded in barangay</div>
-      </div>
+        <div class="bhw-kpi-foot">Recorded households</div>
+      </a>
 
-      <div class="bhw-kpi-card">
-        <div class="bhw-kpi-top">
-          <span>Drafts</span>
-          <a href="#/forms" class="bhw-kpi-arrow" title="View saved drafts" aria-label="View drafts">${icon('arrowUpRight', 14)}</a>
-        </div>
+      <a class="bhw-kpi" data-kpi="amber" href="#/forms/draft" aria-label="Drafts: ${drafts.length}. View drafts">
+        <span class="bhw-kpi-label">Drafts</span>
         <div class="bhw-kpi-value">${drafts.length}</div>
-        <div class="bhw-kpi-foot"><span class="bhw-dot amber"></span> Awaiting completion</div>
-      </div>
+        <div class="bhw-kpi-foot">Awaiting completion</div>
+      </a>
 
-      <div class="bhw-kpi-card">
-        <div class="bhw-kpi-top">
-          <span>Positive containers</span>
-          <a href="#/forms" class="bhw-kpi-arrow" title="View positive containers" aria-label="View positive containers">${icon('arrowUpRight', 14)}</a>
-        </div>
-        <div class="bhw-kpi-value">${positiveTotal}</div>
-        <div class="bhw-kpi-foot"><span class="bhw-dot red"></span> With larvae or pupae</div>
-      </div>
+      <a class="bhw-kpi" data-kpi="red" href="#/forms/positive" aria-label="Positive containers: ${positiveTotal}. View forms with positive containers">
+        <span class="bhw-kpi-label">Positive containers</span>
+        <div class="bhw-kpi-value ${positiveTotal > 0 ? 'is-alert' : ''}">${positiveTotal}</div>
+        <div class="bhw-kpi-foot">With larvae or pupae</div>
+      </a>
 
-      <div class="bhw-kpi-card">
-        <div class="bhw-kpi-top">
-          <span>Waiting to sync</span>
-          <a href="#/forms" class="bhw-kpi-arrow" title="View pending uploads" aria-label="View waiting to sync">${icon('arrowUpRight', 14)}</a>
-        </div>
+      <a class="bhw-kpi" data-kpi="blue" href="#/forms/pending" aria-label="Waiting to sync: ${queue.length}. View forms waiting to sync">
+        <span class="bhw-kpi-label">Waiting to sync</span>
         <div class="bhw-kpi-value">${queue.length}</div>
-        <div class="bhw-kpi-foot"><span class="bhw-dot blue"></span> Pending upload</div>
-      </div>
+        <div class="bhw-kpi-foot">Pending upload</div>
+      </a>
     </div>
 
     <div class="bhw-dashboard-split">
@@ -251,7 +175,7 @@ export async function renderDashboard(root) {
       head: s.headOfFamily,
       purok: s.purokName || `Purok ${s.purokId}`,
       time: formatRelativeTime(s.surveyedAt),
-      badge: 'Synced',
+      badge: 'Submitted',
       cls: 'synced',
       ts: s.surveyedAt || 0
     }))

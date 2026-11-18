@@ -251,4 +251,15 @@ CREATE INDEX idx_alert_barangay_time ON alert (barangay_id, issued_at);
 CREATE INDEX idx_event_time ON event_log (at);
 `;
 
-export const MIGRATIONS: Migration[] = [{ name: "001_init", sql: INIT }];
+export const MIGRATIONS: Migration[] = [
+  { name: "001_init", sql: INIT },
+  {
+    name: "002_bhw_submission_id",
+    sql: `
+      ALTER TABLE entomological_survey ADD COLUMN client_submission_id TEXT;
+      CREATE UNIQUE INDEX idx_survey_client_submission_id
+        ON entomological_survey (client_submission_id)
+        WHERE client_submission_id IS NOT NULL;
+    `,
+  },
+];

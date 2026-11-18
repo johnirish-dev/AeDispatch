@@ -1,4 +1,5 @@
 import { get } from '../shared/api.js';
+import { showModal } from './alerts.js';
 
 export const Store = {
   getKey(key, defaultVal) {
@@ -31,6 +32,8 @@ export const Store = {
   },
   getToken() { return this.getKey('aed.bhw.token', null); },
   setToken(token) { return this.setKey('aed.bhw.token', token); },
+  getContext() { return this.getKey('aed.bhw.context', null); },
+  setContext(context) { return this.setKey('aed.bhw.context', context); },
 
   getDrafts() {
     this.cleanLegacySeed();
@@ -40,8 +43,14 @@ export const Store = {
     const drafts = this.getDrafts().filter(d => d.id !== draft.id);
     drafts.unshift(draft);
     if (!this.setKey('aed.bhw.drafts', drafts)) {
-      alert('This phone cannot save drafts.');
+      showModal({
+        type: 'error',
+        title: 'Draft not saved',
+        message: 'This phone could not save the draft, so the form stays open. Free up some storage space on the phone, then try again.'
+      });
+      return false;
     }
+    return true;
   },
   deleteDraft(id) {
     this.setKey('aed.bhw.drafts', this.getDrafts().filter(d => d.id !== id));
@@ -55,6 +64,13 @@ export const Store = {
     const q = this.getQueue().filter(i => i.id !== item.id);
     q.unshift(item);
     this.setKey('aed.bhw.queue', q);
+  },
+  updateQueueItem(id, patch) {
+    const queue = this.getQueue();
+    const item = queue.find(i => i.id === id);
+    if (!item) return false;
+    Object.assign(item, patch);
+    return this.setKey('aed.bhw.queue', queue);
   },
   dequeue(id) {
     this.setKey('aed.bhw.queue', this.getQueue().filter(i => i.id !== id));

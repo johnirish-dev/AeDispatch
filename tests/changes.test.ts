@@ -194,6 +194,16 @@ describe("BHW survey", () => {
     expect(saved.location).toBe("natural");
   });
 
+  it("returns the original survey when a queued submission is retried", () => {
+    const { db, changes } = setup();
+    const { bhw, body } = survey(db, { clientSubmissionId: "offline-test-1" });
+    const before = count(db, "entomological_survey");
+    const first = changes.submitSurvey(bhw, body);
+    const second = changes.submitSurvey(bhw, body);
+    expect(second.surveyId).toBe(first.surveyId);
+    expect(count(db, "entomological_survey")).toBe(before + 1);
+  });
+
   it("marks the task in progress, or completed when the BHW says so", () => {
     const { db, changes } = setup();
     const jun = bhwOf(db, "Jun M. Santos");

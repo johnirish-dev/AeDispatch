@@ -1,6 +1,22 @@
 import { Store } from './store.js';
 import { setBearerToken, get } from '../shared/api.js';
 import { initRouter } from './router.js';
+import { initAutoSync } from './sync.js';
+
+function registerOfflineShell() {
+  if (!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(() => {
+    // Local drafts and the retry queue still work without service workers.
+  });
+}
+
+function applyContext(me) {
+  document.getElementById('user-brgy').textContent = `Barangay ${me.barangay.name}`;
+  document.getElementById('user-avatar').textContent = me.barangay.name.substring(0, 2).toUpperCase();
+  document.getElementById('mobile-user-brgy').textContent = `Barangay ${me.barangay.name}`;
+  document.getElementById('mobile-user-avatar').textContent = me.barangay.name.substring(0, 2).toUpperCase();
+  window.bhwContext = me;
+}
 
 function initSidebarToggle() {
   const sidebar = document.getElementById('sidebar');
@@ -10,7 +26,6 @@ function initSidebarToggle() {
   toggleBtn.addEventListener('click', () => {
     const isCollapsed = sidebar.classList.toggle('collapsed');
     const label = isCollapsed ? 'Expand sidebar' : 'Collapse sidebar';
-    toggleBtn.setAttribute('title', label);
     toggleBtn.setAttribute('data-tooltip', label);
     toggleBtn.setAttribute('aria-label', label);
     toggleBtn.setAttribute('aria-expanded', String(!isCollapsed));
@@ -18,6 +33,7 @@ function initSidebarToggle() {
 }
 
 async function init() {
+  registerOfflineShell();
   initSidebarToggle();
 
   const url = new URL(window.location.href);
@@ -39,22 +55,25 @@ async function init() {
   }
 
   setBearerToken(token);
+  initAutoSync();
 
   try {
     const me = await get('/api/bhw/me');
-
-    document.getElementById('user-brgy').textContent = `Barangay ${me.barangay.name}`;
-    const initials = me.barangay.name.substring(0, 2).toUpperCase();
-    document.getElementById('user-avatar').textContent = initials;
-
-    window.bhwContext = me;
+    Store.setContext(me);
+    applyContext(me);
     initRouter(appRoot);
   } catch (err) {
     if (err.status === 401) {
       appRoot.innerHTML = '<div style="padding: 20px;">This link is not valid. Ask the health office for a new one.</div>';
       Store.setToken(null);
     } else {
-      appRoot.innerHTML = '<div style="padding: 20px;">Error connecting to the server.</div>';
+      const cached = Store.getContext();
+      if (!cached) {
+        appRoot.innerHTML = '<div style="padding: 20px;">Connect once to load this BHW workspace for offline use.</div>';
+        return;
+      }
+      applyContext(cached);
+      initRouter(appRoot);
     }
   }
 }

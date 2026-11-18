@@ -107,6 +107,7 @@ export function updateTaskStatus(db: Db, id: number, status: TaskStatus, at: str
 // ---- entomological surveys -------------------------------------------------
 
 export interface NewSurvey {
+  clientSubmissionId?: string;
   taskId?: number | null;
   bhwId?: number | null;
   barangayId: number;
@@ -145,12 +146,13 @@ export function insertSurvey(db: Db, s: NewSurvey, containers: NewContainer[]): 
     const info = db
       .prepare(
         `INSERT INTO entomological_survey
-          (task_id, bhw_id, barangay_id, purok_id, house_no, head_of_family, age, sex, civil_status, occupation,
+          (client_submission_id, task_id, bhw_id, barangay_id, purok_id, house_no, head_of_family, age, sex, civil_status, occupation,
            persons_slept, building_structure, storeys, rooms, screened, surveyed_by, survey_date,
            no_containers_found, submitted_at, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
+        s.clientSubmissionId ?? null,
         s.taskId ?? null,
         s.bhwId ?? null,
         s.barangayId,

@@ -24,9 +24,9 @@ export function initRouter(appRoot) {
       updateNav('survey');
       const param = hash.split('/')[2]; 
       await renderSurvey(appRoot, param);
-    } else if (hash === '#/forms') {
+    } else if (hash.startsWith('#/forms')) {
       updateNav('forms');
-      await renderMyForms(appRoot);
+      await renderMyForms(appRoot, hash.split('/')[2]);
     } else {
       window.location.hash = '#/';
     }

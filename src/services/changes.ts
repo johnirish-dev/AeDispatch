@@ -50,6 +50,7 @@ import type { RankingService } from "./ranking";
 export const CONTAINER_LOCATIONS = ["indoor", "outdoor", "natural"] as const;
 
 export interface SurveySubmission {
+  clientSubmissionId?: unknown;
   taskId?: number | null;
   purokId: unknown;
   houseNo: unknown;
@@ -177,6 +178,13 @@ export class DataChanges {
    * its containers, updates the task, logs it and re-scores the barangay.
    */
   submitSurvey(bhw: Bhw, s: SurveySubmission): { surveyId: number } {
+    const clientSubmissionId = v.optionalText(s.clientSubmissionId, "clientSubmissionId", 100);
+    if (clientSubmissionId) {
+      const existing = this.db
+        .prepare("SELECT id FROM entomological_survey WHERE client_submission_id = ? AND bhw_id = ?")
+        .get(clientSubmissionId, bhw.id) as { id: number } | undefined;
+      if (existing) return { surveyId: existing.id };
+    }
     const surveyDate = v.dateText(s.surveyDate, "surveyDate");
     if (surveyDate > this.today()) throw new AppError(400, "The survey date cannot be in the future.");
 
@@ -207,6 +215,7 @@ export class DataChanges {
       const id = insertSurvey(
         this.db,
         {
+          clientSubmissionId,
           taskId,
           bhwId: bhw.id,
           barangayId: bhw.barangayId,

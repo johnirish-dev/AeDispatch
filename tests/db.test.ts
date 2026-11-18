@@ -31,7 +31,7 @@ describe("schema", () => {
   it("runs migrations once and only once", () => {
     const db = emptyDb();
     expect(runMigrations(db)).toEqual([]);
-    expect(count(db, "schema_migrations")).toBe(1);
+    expect(count(db, "schema_migrations")).toBe(2);
   });
 
   it("enforces foreign keys and check constraints", () => {
