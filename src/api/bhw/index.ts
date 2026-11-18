@@ -28,8 +28,10 @@ export function bhwRoutes({ db, changes }: AppDeps): Router {
 
   router.post("/surveys", (req, res) => {
     const body = v.bodyObject(req.body);
-    const { surveyId } = changes.submitSurvey(req.bhwBarangayId!, body as never);
-    res.status(201).json({ surveyId });
+    const result = changes.submitSurvey(req.bhwBarangayId!, body as never);
+    // 201 for a new survey; 200 when this submissionId was already saved (a repeated send changes nothing).
+    if (result.duplicate) res.status(200).json({ surveyId: result.surveyId, duplicate: true });
+    else res.status(201).json({ surveyId: result.surveyId });
   });
 
   return router;

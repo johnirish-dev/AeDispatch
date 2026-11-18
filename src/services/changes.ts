@@ -29,6 +29,7 @@ import {
   TaskStatus,
   addEvent,
   getTask,
+  findSurveyBySubmission,
   insertSurvey,
   updateTaskStatus,
 } from "../db/repositories/workflowRepo";
@@ -68,11 +69,21 @@ export interface SurveySubmission {
   screened?: unknown;
   /** The BHW who did the interview: one of the barangay's registered BHWs, chosen on the form. */
   interviewerId: unknown;
+  /** Optional. Made by the phone for each submission: the same value sent again is not saved twice. */
+  submissionId?: unknown;
   surveyDate: unknown;
   noContainersFound?: unknown;
   containers?: unknown;
   /** The BHW says the task is finished. */
   completeTask?: unknown;
+}
+
+/** 8 to 64 letters, digits, dashes or underscores (a UUID fits). */
+function checkSubmissionId(value: unknown): string {
+  if (typeof value !== "string" || !/^[A-Za-z0-9_-]{8,64}$/.test(value)) {
+    throw new AppError(400, "submissionId must be 8 to 64 letters, digits, - or _.");
+  }
+  return value;
 }
 
 export interface BarangayInput {
@@ -211,7 +222,15 @@ export class DataChanges {
    * Checks a submitted entomological survey like the paper form, saves it with
    * its containers, updates the task, logs it and re-scores the barangay.
    */
-  submitSurvey(barangayId: number, s: SurveySubmission): { surveyId: number } {
+  submitSurvey(barangayId: number, s: SurveySubmission): { surveyId: number; duplicate?: true } {
+    // A repeated send (a retry after a lost reply, or an automatic sync) is answered with the first result
+    // and changes nothing: no second survey, no second log line, no second re-score.
+    const submissionId = s.submissionId === undefined || s.submissionId === null ? null : checkSubmissionId(s.submissionId);
+    if (submissionId !== null) {
+      const existing = findSurveyBySubmission(this.db, barangayId, submissionId);
+      if (existing !== undefined) return { surveyId: existing, duplicate: true };
+    }
+
     const surveyDate = v.dateText(s.surveyDate, "surveyDate");
     if (surveyDate > this.today()) throw new AppError(400, "The survey date cannot be in the future.");
 
@@ -265,6 +284,7 @@ export class DataChanges {
           surveyDate,
           noContainersFound,
           submittedAt,
+          clientSubmissionId: submissionId,
         },
         containers,
       );

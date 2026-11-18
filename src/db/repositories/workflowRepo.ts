@@ -126,6 +126,8 @@ export interface NewSurvey {
   surveyDate: string;
   noContainersFound: boolean;
   submittedAt: string;
+  /** Made by the phone; the same value sent again is the same survey. */
+  clientSubmissionId?: string | null;
 }
 
 export interface NewContainer {
@@ -139,6 +141,14 @@ export interface NewContainer {
   pupaeCount?: number;
 }
 
+/** The survey already saved under this submission id in this barangay, if any. */
+export function findSurveyBySubmission(db: Db, barangayId: number, clientSubmissionId: string): number | undefined {
+  const r = db
+    .prepare("SELECT id FROM entomological_survey WHERE barangay_id = ? AND client_submission_id = ?")
+    .get(barangayId, clientSubmissionId) as { id: number } | undefined;
+  return r?.id;
+}
+
 /** Saves a survey and its container rows together. Returns the survey id. */
 export function insertSurvey(db: Db, s: NewSurvey, containers: NewContainer[]): number {
   return db.transaction(() => {
@@ -147,8 +157,8 @@ export function insertSurvey(db: Db, s: NewSurvey, containers: NewContainer[]): 
         `INSERT INTO entomological_survey
           (task_id, bhw_id, barangay_id, purok_id, house_no, head_of_family, age, sex, civil_status, occupation,
            persons_slept, building_structure, storeys, rooms, screened, surveyed_by, survey_date,
-           no_containers_found, submitted_at, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           no_containers_found, submitted_at, created_at, client_submission_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         s.taskId ?? null,
@@ -171,6 +181,7 @@ export function insertSurvey(db: Db, s: NewSurvey, containers: NewContainer[]): 
         s.noContainersFound ? 1 : 0,
         s.submittedAt,
         s.submittedAt,
+        s.clientSubmissionId ?? null,
       );
     const id = Number(info.lastInsertRowid);
     const ins = db.prepare(

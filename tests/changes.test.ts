@@ -223,6 +223,85 @@ describe("BHW survey", () => {
     expectError(() => changes.submitSurvey(bhw.barangayId, { ...body, interviewerId: jun.id }), 400, /list of this barangay/);
   });
 
+  describe("a repeated send (retry or automatic sync)", () => {
+    const ID = "phone-0001-abcd";
+    const totals = (db: Db) => ({
+      surveys: count(db, "entomological_survey"),
+      containers: count(db, "survey_container"),
+      events: count(db, "event_log"),
+      scores: count(db, "threat_score"),
+    });
+
+    it("is saved once: the same survey id comes back, and nothing else changes (no second survey, log line or re-score)", () => {
+      const { db, changes } = setup();
+      const { bhw, body } = survey(db);
+      const first = changes.submitSurvey(bhw.barangayId, { ...body, submissionId: ID });
+      expect(first.duplicate).toBeUndefined();
+      const afterFirst = totals(db);
+      const again = changes.submitSurvey(bhw.barangayId, { ...body, submissionId: ID });
+      expect(again).toEqual({ surveyId: first.surveyId, duplicate: true });
+      expect(totals(db)).toEqual(afterFirst);
+    });
+
+    it("is answered with the first result even when the repeat differs or the task has moved on", () => {
+      const { db, changes } = setup();
+      const jun = bhwOf(db, "Jun M. Santos");
+      const taskId = (db.prepare("SELECT id FROM field_task WHERE bhw_id = ? AND status = 'new'").get(jun.id) as { id: number }).id;
+      const purokId = getBarangay(db, jun.barangayId)!.puroks[0].id;
+      const base = { purokId, houseNo: "3", interviewerId: jun.id, surveyDate: ANCHOR, noContainersFound: true, taskId, submissionId: ID, completeTask: true };
+      const first = changes.submitSurvey(jun.barangayId, base);
+      const afterFirst = totals(db);
+      const again = changes.submitSurvey(jun.barangayId, { ...base, houseNo: "99", completeTask: false });
+      expect(again).toEqual({ surveyId: first.surveyId, duplicate: true });
+      expect(totals(db)).toEqual(afterFirst);
+      expect((db.prepare("SELECT house_no FROM entomological_survey WHERE id = ?").get(first.surveyId) as { house_no: string }).house_no).toBe("3");
+      expect((db.prepare("SELECT status FROM field_task WHERE id = ?").get(taskId) as { status: string }).status).toBe("completed");
+    });
+
+    it("the same id in another barangay is a different submission", () => {
+      const { db, changes } = setup();
+      const rico = survey(db); // Mabini
+      const jun = bhwOf(db, "Jun M. Santos");
+      const junBody = { ...rico.body, purokId: getBarangay(db, jun.barangayId)!.puroks[0].id, interviewerId: jun.id };
+      const a = changes.submitSurvey(rico.bhw.barangayId, { ...rico.body, submissionId: ID });
+      const b = changes.submitSurvey(jun.barangayId, { ...junBody, submissionId: ID });
+      expect(b.duplicate).toBeUndefined();
+      expect(b.surveyId).not.toBe(a.surveyId);
+    });
+
+    it("without a submission id two identical sends are two surveys (older clients keep working)", () => {
+      const { db, changes } = setup();
+      const { bhw, body } = survey(db);
+      const before = count(db, "entomological_survey");
+      const a = changes.submitSurvey(bhw.barangayId, body);
+      const b = changes.submitSurvey(bhw.barangayId, body);
+      expect(b.surveyId).not.toBe(a.surveyId);
+      expect(count(db, "entomological_survey")).toBe(before + 2);
+    });
+
+    it.each([
+      ["too short", "abc123"],
+      ["too long", "x".repeat(65)],
+      ["bad characters", "phone 0001 ab!"],
+      ["not a string", 12345678],
+    ])("rejects an id that is %s, and saves nothing", (_label, submissionId) => {
+      const { db, changes } = setup();
+      const { bhw, body } = survey(db);
+      const before = totals(db);
+      expectError(() => changes.submitSurvey(bhw.barangayId, { ...body, submissionId }), 400, /submissionId/);
+      expect(totals(db)).toEqual(before);
+    });
+
+    it("a refused survey does not use up its id: the corrected one is saved", () => {
+      const { db, changes } = setup();
+      const { bhw, body } = survey(db);
+      expectError(() => changes.submitSurvey(bhw.barangayId, { ...body, submissionId: ID, houseNo: " " }), 400, /houseNo/);
+      const ok = changes.submitSurvey(bhw.barangayId, { ...body, submissionId: ID });
+      expect(ok.duplicate).toBeUndefined();
+      expect(count(db, "entomological_survey")).toBeGreaterThan(0);
+    });
+  });
+
   it("marks the task in progress, or completed when the BHW says so", () => {
     const { db, changes } = setup();
     const jun = bhwOf(db, "Jun M. Santos");

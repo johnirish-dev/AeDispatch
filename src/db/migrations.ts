@@ -275,8 +275,17 @@ CREATE TABLE barangay_access (
 );
 `;
 
+// A survey can carry an id made by the phone, so a send that is repeated (a retry after a lost reply, or an
+// automatic sync) is recognised and saved once. The id is only unique within one barangay.
+const SURVEY_SUBMISSION_ID = `
+ALTER TABLE entomological_survey ADD COLUMN client_submission_id TEXT;
+CREATE UNIQUE INDEX idx_survey_submission ON entomological_survey (barangay_id, client_submission_id)
+  WHERE client_submission_id IS NOT NULL;
+`;
+
 export const MIGRATIONS: Migration[] = [
   { name: "001_init", sql: INIT },
   { name: "002_anonymous_answers", sql: ANONYMOUS_ANSWERS },
   { name: "003_barangay_access", sql: BARANGAY_ACCESS },
+  { name: "004_survey_submission_id", sql: SURVEY_SUBMISSION_ID },
 ];
