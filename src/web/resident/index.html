@@ -198,6 +198,7 @@
         <div class="card hero-card" id="home-hero-card">
           <span class="status-pill pill-elevated" id="home-risk-pill"></span>
           <h1 class="section-title" style="margin-top: 10px;" id="home-headline"></h1>
+          <p class="muted-text" style="margin-top: 6px;" id="home-updated"></p>
 
           <div class="risk-meter">
             <div class="meter-track" id="meter-track">
@@ -219,14 +220,14 @@
           </button>
         </div>
 
-        <!-- 7-day breeding outlook -->
+        <!-- Rain of the last 7 days (real weather record) -->
         <div class="card">
           <div class="card-header-row">
             <div>
-              <h2 class="card-title" data-i18n="home.outlook">7-day breeding outlook</h2>
-              <p class="muted-text" data-i18n="home.outlookNote">Illustrative forecast · not live weather</p>
+              <h2 class="card-title" data-i18n="home.outlook">Rain in the last 7 days</h2>
+              <p class="muted-text" data-i18n="home.outlookNote">Daily rainfall in your municipality</p>
             </div>
-            <span class="outline-pill" id="peak-badge"></span>
+            <span class="outline-pill" id="rain-total-badge"></span>
           </div>
           <div class="outlook-bars" id="outlook-bars" role="img"></div>
         </div>
@@ -263,6 +264,8 @@
           <p class="muted-text" data-i18n="reportcard.body">Optional. You'll sign in with your mobile number to send a report.</p>
           <button type="button" class="btn-outline-pill" id="open-report-btn" style="margin-top: 12px;" data-i18n="reportcard.btn">Report what you see</button>
         </div>
+
+        <p class="muted-text" style="text-align: center; font-size: 0.78rem;" data-i18n="home.disclaimer">AeDispatch is an early-warning aid, not a medical diagnosis. If you or someone at home has a fever, see a doctor.</p>
       </div>
 
       <div id="home-error" class="stack" hidden>
@@ -292,7 +295,8 @@
 
       <div>
         <p class="muted-text" style="margin-bottom: 4px;" id="warn-dates"></p>
-        <h1 class="section-title" data-i18n="warn.title">Mosquito-hatching conditions ahead</h1>
+        <h1 class="section-title" id="warn-title">Weather conditions</h1>
+        <p class="muted-text" style="margin-top: 6px;" data-i18n="warn.lead">Weather is one of the things we look at, together with reports from households and health workers.</p>
       </div>
 
       <div>
@@ -300,13 +304,13 @@
         <div class="two-col">
           <div class="card stat-card-amber">
             <span class="card-title" style="font-size: 0.86rem;" data-i18n="warn.temp">Temperature</span>
-            <div class="stat-value" data-i18n="warn.tempValue">28 to 31 °C</div>
-            <p class="muted-text" data-i18n="warn.tempNote">Ideal range for Aedes to breed and bite.</p>
+            <div class="stat-value" id="warn-temp-value">–</div>
+            <p class="muted-text" id="warn-temp-note"></p>
           </div>
           <div class="card stat-card-teal">
             <span class="card-title" style="font-size: 0.86rem;" data-i18n="warn.rain">Rain</span>
-            <div class="stat-value" data-i18n="warn.rainValue">4 of 7 days</div>
-            <p class="muted-text" data-i18n="warn.rainNote">Rain refills containers and triggers eggs to hatch.</p>
+            <div class="stat-value" id="warn-rain-value">–</div>
+            <p class="muted-text" id="warn-rain-note"></p>
           </div>
         </div>
       </div>

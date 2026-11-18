@@ -3,7 +3,9 @@ import { openDatabase } from "../src/db/connection";
 import { runMigrations } from "../src/db/migrate";
 import { MIGRATIONS } from "../src/db/migrations";
 import { addAnonymousAnswer, addSymptomCheck, answerTotals } from "../src/db/repositories/signalRepo";
+import { latestScoreFor } from "../src/db/repositories/scoreRepo";
 import { anonymousDailyCap } from "../src/services/changes";
+import { RAIN_FAVORABLE_FROM, TEMP_FAVORABLE_FROM, weatherOf } from "../src/services/residentViews";
 import { PIN_MAX_TRIES, PIN_RESEND_SECONDS, PIN_TTL_SECONDS } from "../src/services/residentAuth";
 import { ANCHOR, Api, startApi } from "./apiHelpers";
 import { count } from "./helpers";
@@ -35,6 +37,31 @@ describe("migration 002", () => {
   });
 });
 
+describe("the weather shown to residents (weatherOf)", () => {
+  const summary = (w: Record<string, unknown>, asOf: unknown = "2026-11-19") => ({ asOf, details: { weather: { meanTempC: 28.54, tempIndex: 0.9, rainIndex: 0.6, rainDays: 4, rainDaysWindow: 7, rainTotalMm: 90.4, ...w } } });
+
+  it("rounds for display and keeps the numbers", () => {
+    expect(weatherOf(summary({}))).toEqual({ asOf: "2026-11-19", meanTempC: 28.5, rainDays: 4, rainDaysWindow: 7, rainTotalMm: 90, tempFavorable: true, rainFavorable: true });
+  });
+
+  it("the favorable cut-offs are inclusive and exact", () => {
+    expect(weatherOf(summary({ tempIndex: TEMP_FAVORABLE_FROM }))!.tempFavorable).toBe(true);
+    expect(weatherOf(summary({ tempIndex: TEMP_FAVORABLE_FROM - 0.001 }))!.tempFavorable).toBe(false);
+    expect(weatherOf(summary({ rainIndex: RAIN_FAVORABLE_FROM }))!.rainFavorable).toBe(true);
+    expect(weatherOf(summary({ rainIndex: RAIN_FAVORABLE_FROM - 0.001 }))!.rainFavorable).toBe(false);
+  });
+
+  it("with no temperature data the temperature is not called favorable", () => {
+    expect(weatherOf(summary({ meanTempC: null, tempIndex: 0.9 }))).toMatchObject({ meanTempC: null, tempFavorable: false });
+  });
+
+  it("gives null when the stored summary does not have the weather", () => {
+    for (const bad of [null, undefined, {}, { asOf: "2026-11-19" }, { asOf: "2026-11-19", details: {} }, summary({ rainTotalMm: "90" }), summary({ rainDays: NaN }), summary({}, 5)]) {
+      expect(weatherOf(bad), JSON.stringify(bad)).toBeNull();
+    }
+  });
+});
+
 describe("resident routes", () => {
   let api: Api;
   beforeAll(async () => {
@@ -62,6 +89,67 @@ describe("resident routes", () => {
         expect(keys, forbidden).not.toContain(forbidden);
       }
       for (const a of res.body.alerts) expect(a.message).not.toMatch(/\bcases?\b|purok/i);
+    });
+
+    it("shows the weather the level was calculated from: the same numbers as the stored score, the same for every barangay", async () => {
+      const res = await api.client().get(`/api/resident/barangays/${barangayId("Bascaran")}`);
+      const stored = latestScoreFor(api.db, barangayId("Bascaran"))!.rawSummary as { asOf: string; details: { weather: { meanTempC: number; rainDays: number; rainDaysWindow: number; rainTotalMm: number } } };
+      const w = stored.details.weather;
+      expect(Object.keys(res.body.weather).sort()).toEqual(["asOf", "days", "meanTempC", "rainDays", "rainDaysWindow", "rainFavorable", "rainTotalMm", "tempFavorable"]);
+      expect(res.body.weather).toMatchObject({ asOf: stored.asOf, meanTempC: Math.round(w.meanTempC * 10) / 10, rainDays: w.rainDays, rainDaysWindow: w.rainDaysWindow, rainTotalMm: Math.round(w.rainTotalMm) });
+      expect(res.body.weather.days).toHaveLength(7);
+      const other = await api.client().get(`/api/resident/barangays/${barangayId("Mabini")}`);
+      expect(other.body.weather).toEqual(res.body.weather);
+    });
+
+    it("follows the weather: a heavy-rain week and a dry week give different numbers and flags, and a reset brings the first ones back", async () => {
+      const view = async () => (await api.client().get(`/api/resident/barangays/${barangayId("Bascaran")}`)).body.weather;
+      const officer = await api.officer();
+      const before = await view();
+
+      await officer.post("/api/officer/demo/weather", { preset: "heavy_rain" });
+      const wet = await view();
+      expect(wet).toMatchObject({ rainDays: 7, rainDaysWindow: 7, rainFavorable: true });
+      expect(wet.rainTotalMm).toBeGreaterThan(200);
+
+      await officer.post("/api/officer/demo/weather", { preset: "dry" });
+      const dry = await view();
+      expect(dry).toMatchObject({ rainFavorable: false, tempFavorable: false }); // hot and dry: outside the favorable range
+      expect(dry.meanTempC).toBeGreaterThan(33);
+      expect(dry.rainDays).toBeLessThan(3);
+
+      await officer.post("/api/officer/demo/weather/reset");
+      expect(await view()).toEqual(before);
+    });
+
+    it("gives the rain of each of the last 7 days, the same record the score used, and the rain-day count agrees with it", async () => {
+      const res = await api.client().get(`/api/resident/barangays/${barangayId("Bascaran")}`);
+      const { asOf, days, rainDays } = res.body.weather as { asOf: string; days: { date: string; rainMm: number | null }[]; rainDays: number };
+      expect(days).toHaveLength(7);
+      expect(days[6].date).toBe(asOf); // the last bar is the day the level was calculated for
+      for (let i = 1; i < 7; i++) expect(new Date(`${days[i].date}T00:00:00Z`).getTime() - new Date(`${days[i - 1].date}T00:00:00Z`).getTime()).toBe(86_400_000);
+      const record = api.db.prepare("SELECT date, rainfall_mm AS mm FROM weather_record WHERE source = 'file' AND date BETWEEN ? AND ? ORDER BY date").all(days[0].date, asOf) as { date: string; mm: number }[];
+      expect(days.map((d) => d.rainMm)).toEqual(record.map((r) => Math.round(r.mm * 10) / 10));
+      expect(days.filter((d) => d.rainMm !== null && d.rainMm > 1).length).toBe(rainDays); // the chart and the "x of 7 days" number say the same
+    });
+
+    it("the chart follows the simulator: a heavy-rain week is 7 wet days, a dry week nearly none, and a day with no record is null", async () => {
+      const officer = await api.officer();
+      const days = async () => (await api.client().get(`/api/resident/barangays/${barangayId("Bascaran")}`)).body.weather.days as { date: string; rainMm: number | null }[];
+      await officer.post("/api/officer/demo/weather", { preset: "heavy_rain" });
+      expect((await days()).every((d) => d.rainMm !== null && d.rainMm >= 20)).toBe(true);
+      await officer.post("/api/officer/demo/weather", { preset: "dry" });
+      expect((await days()).filter((d) => (d.rainMm ?? 0) > 1).length).toBeLessThan(3);
+      await officer.post("/api/officer/demo/weather/reset");
+      const asOf = (await days())[6].date;
+      api.db.prepare("DELETE FROM weather_record WHERE date = ?").run(asOf); // a missing day
+      expect((await days())[6]).toEqual({ date: asOf, rainMm: null });
+    });
+
+    it("never gives a score or an index next to the weather", async () => {
+      const res = await api.client().get(`/api/resident/barangays/${barangayId("Bascaran")}`);
+      const keys = keysOf(res.body.weather).map((k) => k.toLowerCase());
+      for (const forbidden of ["index", "tempindex", "rainindex", "score", "weights"]) expect(keys, forbidden).not.toContain(forbidden);
     });
 
     it("answers 404 for an unknown barangay and 400 for a bad id", async () => {

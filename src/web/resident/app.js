@@ -99,7 +99,7 @@ function applyLanguage() {
   renderAlertsOption();
   renderPinTexts();
   renderHome();
-  renderWarningDates();
+  renderWarning(state.weather ?? null, state.level ?? null);
   renderAlerts();
   renderSymptomResult();
 }
@@ -301,6 +301,9 @@ async function renderHome() {
   }
   if (token !== renderToken) return;
   const failed = risk === null || risk.level === null;
+  state.weather = failed ? null : risk.weather;
+  state.level = failed ? null : risk.level;
+  renderWarning(state.weather, state.level);
   $("home-listed").hidden = failed;
   $("home-error").hidden = !failed;
   if (failed) return;
@@ -317,23 +320,11 @@ async function renderHome() {
   });
   $$("#meter-labels span").forEach((label, i) => label.classList.toggle("active", i === step));
 
-  const today = new Date();
-  const bars = $("outlook-bars");
-  bars.replaceChildren();
-  risk.bars.forEach((height, i) => {
-    const column = document.createElement("div");
-    column.className = "bar-col";
-    const fill = document.createElement("div");
-    fill.className = "bar-fill" + (i === risk.peakDay ? " peak" : "");
-    fill.style.height = `${height}px`;
-    const day = document.createElement("span");
-    day.className = "bar-day";
-    day.textContent = t(`dayShort.${(today.getDay() + i) % 7}`);
-    column.append(fill, day);
-    bars.append(column);
-  });
-  bars.setAttribute("aria-label", `${t("home.outlook")}. ${t("home.outlookNote")}`);
-  $("peak-badge").textContent = t("home.peak", { day: t(`dayAbbr.${(today.getDay() + risk.peakDay) % 7}`) });
+  renderRainChart(risk.weather);
+  const updated = $("home-updated");
+  updated.textContent = risk.weather
+    ? t("home.updated", { date: new Intl.DateTimeFormat(t("locale"), { weekday: "short", month: "short", day: "numeric" }).format(new Date(`${risk.weather.asOf}T12:00:00`)) })
+    : "";
 
   $("alert-dot").hidden = !(state.alertsOn && (risk.level === "elevated" || risk.level === "high"));
 }
@@ -393,13 +384,74 @@ function skipDaily() {
   showToast(t("toast.skipped"));
 }
 
+// The bars are the real rain of the last 7 days (mm), from the same weather record the risk level used.
+// The rainiest day is highlighted; a day with no record is a thin grey stub.
+const RAIN_BAR_MAX_PX = 56;
+const RAIN_SCALE_MIN_MM = 20; // so a drizzle does not fill the chart
+
+function renderRainChart(weather) {
+  const bars = $("outlook-bars");
+  const badge = $("rain-total-badge");
+  bars.replaceChildren();
+  if (!weather || !Array.isArray(weather.days)) {
+    badge.textContent = "";
+    bars.setAttribute("aria-label", t("warn.noData"));
+    return;
+  }
+  const values = weather.days.map((d) => d.rainMm);
+  const known = values.filter((v) => v !== null);
+  const top = Math.max(RAIN_SCALE_MIN_MM, ...known);
+  const rainiest = known.length > 0 && Math.max(...known) > 0 ? values.indexOf(Math.max(...known)) : -1;
+  const label = [];
+  weather.days.forEach((d, i) => {
+    const mm = d.rainMm;
+    const weekday = new Date(`${d.date}T12:00:00`).getDay();
+    const column = document.createElement("div");
+    column.className = "bar-col";
+    const fill = document.createElement("div");
+    fill.className = "bar-fill" + (i === rainiest ? " peak" : "") + (mm === null ? " missing" : "");
+    fill.style.height = `${mm === null ? 3 : Math.max(3, Math.round((mm / top) * RAIN_BAR_MAX_PX))}px`;
+    const day = document.createElement("span");
+    day.className = "bar-day";
+    day.textContent = t(`dayShort.${weekday}`);
+    column.append(fill, day);
+    bars.append(column);
+    label.push(`${t(`dayAbbr.${weekday}`)} ${mm === null ? "–" : `${mm} mm`}`);
+  });
+  const total = Math.round(known.reduce((a, b) => a + b, 0));
+  badge.textContent = t("home.rainTotal", { mm: total });
+  bars.setAttribute("aria-label", `${t("home.outlook")}. ${label.join(", ")}`);
+}
+
 // ---- warning, alerts -----------------------------------------------------------------------
 
-function renderWarningDates() {
+// The numbers on this screen are the weather the risk level was calculated from (sent by the server),
+// not fixed text. Without them (not scored yet) the screen says so instead of showing example values.
+function renderWarning(weather, level) {
+  // The title follows the level, so a calm barangay is never told that conditions favor mosquitoes.
+  $("warn-title").textContent = t(level ? `warn.title.${level}` : "warn.title.none");
+  const dates = $("warn-dates");
+  const tempValue = $("warn-temp-value");
+  const tempNote = $("warn-temp-note");
+  const rainValue = $("warn-rain-value");
+  const rainNote = $("warn-rain-note");
+  if (!weather) {
+    dates.textContent = "";
+    tempValue.textContent = rainValue.textContent = "–";
+    tempNote.textContent = rainNote.textContent = t("warn.noData");
+    return;
+  }
   const format = new Intl.DateTimeFormat(t("locale"), { weekday: "short", month: "short", day: "numeric" });
-  const start = new Date();
-  const end = new Date(start.getTime() + 4 * 24 * 60 * 60 * 1000);
-  $("warn-dates").textContent = `${format.format(start)} – ${format.format(end)}`;
+  dates.textContent = t("warn.basedOn", { date: format.format(new Date(`${weather.asOf}T12:00:00`)) });
+  if (weather.meanTempC === null) {
+    tempValue.textContent = "–";
+    tempNote.textContent = t("warn.noData");
+  } else {
+    tempValue.textContent = t("warn.tempValue", { temp: weather.meanTempC.toFixed(1) });
+    tempNote.textContent = `${t("warn.tempAvg")} ${t(weather.tempFavorable ? "warn.tempNote.yes" : "warn.tempNote.no")}`;
+  }
+  rainValue.textContent = t("warn.rainValue", { days: weather.rainDays, window: weather.rainDaysWindow });
+  rainNote.textContent = t(weather.rainFavorable ? "warn.rainNote.yes" : "warn.rainNote.no");
 }
 
 const ALERT_ACCENT = { low: "alert-card-low", moderate: "alert-card-moderate", elevated: "alert-card-elevated", high: "alert-card-high" };

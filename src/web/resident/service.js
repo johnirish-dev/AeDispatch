@@ -40,32 +40,16 @@ async function call(path, { method = "GET", body } = {}) {
   return data;
 }
 
-// The 7-day outlook is an illustration (the screen says so): its shape follows the level, and the
-// same barangay always gets the same shape. It is not a forecast and uses no live data.
-const LEVEL_HEIGHT = { low: 24, moderate: 34, elevated: 46, high: 56 };
-
-function outlookFor(level, barangayId) {
-  const base = LEVEL_HEIGHT[level];
-  const peakDay = 1 + (barangayId % 4);
-  const bars = Array.from({ length: 7 }, (_, i) => {
-    const slope = base * (1 - 0.1 * Math.abs(i - peakDay));
-    const wobble = (barangayId * 7 + i * 5) % 5;
-    return Math.round(slope + wobble);
-  });
-  return { bars, peakDay };
-}
-
 export const service = {
   /** [{ id, name, municipality }] */
   listBarangays() {
     return call("/barangays");
   },
 
-  /** { level, alerts: [{ level, issuedAt, message }], bars, peakDay }; level is null if not scored yet. */
+  /** { level, alerts: [{ level, issuedAt, message }], weather }; level is null if not scored yet. weather.days is the rain of the last 7 days. */
   async getRisk(barangayId) {
     const view = await call(`/barangays/${barangayId}`);
-    const outlook = view.level === null ? { bars: [], peakDay: 0 } : outlookFor(view.level, barangayId);
-    return { level: view.level, alerts: view.alerts, ...outlook };
+    return { level: view.level, alerts: view.alerts, weather: view.weather ?? null };
   },
 
   /** The anonymous daily answer: "yes" (more mosquitoes than usual) or "no". */

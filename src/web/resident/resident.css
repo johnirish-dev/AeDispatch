@@ -436,7 +436,7 @@ body {
   padding: 6px 12px;
 }
 
-/* 7-Day Breeding Outlook Chart (R1) */
+/* Rain of the last 7 days (R1) */
 .outlook-bars {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
@@ -464,6 +464,10 @@ body {
 
 .bar-fill.peak {
   background: var(--ae-amber);
+}
+
+.bar-fill.missing {
+  background: #d9dee2;
 }
 
 .bar-day {
@@ -591,22 +595,26 @@ body {
   margin-top: 6px;
 }
 
-/* Alerts Card Accent (R3) */
-.alert-card-elevated {
-  border-left: 4px solid var(--ae-amber);
+/* Alerts Card Accent (R3): a tinted border and a dot before the level, not a thick side bar */
+.alert-card-elevated { border-color: var(--ae-amber); }
+.alert-card-moderate { border-color: var(--ae-navy); }
+.alert-card-low { border-color: var(--ae-teal); }
+.alert-card-high { border-color: var(--ae-red); }
+
+[class*="alert-card-"] .card-title::before {
+  content: "";
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: currentColor;
 }
 
-.alert-card-moderate {
-  border-left: 4px solid var(--ae-navy);
-}
-
-.alert-card-low {
-  border-left: 4px solid var(--ae-teal);
-}
-
-.alert-card-high {
-  border-left: 4px solid var(--ae-red);
-}
+.alert-card-elevated .card-title::before { background: var(--ae-amber); }
+.alert-card-moderate .card-title::before { background: var(--ae-navy); }
+.alert-card-low .card-title::before { background: var(--ae-teal); }
+.alert-card-high .card-title::before { background: var(--ae-red); }
 
 /* Learn Sub-tabs & Banner (R7) */
 .sub-tabs {
@@ -723,7 +731,6 @@ body {
   color: inherit;
   background: var(--res-surface);
   border: 1px solid var(--res-border);
-  border-left: 4px solid var(--ae-navy);
   border-radius: var(--res-radius);
   padding: 14px 15px;
 }
