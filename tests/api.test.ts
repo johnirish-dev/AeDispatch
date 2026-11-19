@@ -5,9 +5,11 @@ import { RESIDENT_COOKIE, SessionManager, requireResident } from "../src/api/aut
 import { createApp } from "../src/app";
 import { listBarangays } from "../src/db/repositories/barangayRepo";
 import { latestScoreFor } from "../src/db/repositories/scoreRepo";
+import { insertSurvey } from "../src/db/repositories/workflowRepo";
 import { DataChanges } from "../src/services/changes";
 import { Decisions } from "../src/services/decisions";
 import { RankingService } from "../src/services/ranking";
+import { addDays } from "../src/util/dates";
 import { Api, ANCHOR, Client, startApi } from "./apiHelpers";
 import { count, dataFile } from "./helpers";
 
@@ -759,6 +761,132 @@ describe("restart", () => {
       } finally {
         server.close();
       }
+    } finally {
+      await api.close();
+    }
+  });
+});
+
+
+// ---- the list of recent surveys a BHW sees (the same on every phone that holds the barangay link) ----
+
+describe("the BHW's list of recent surveys", () => {
+  const payload = (purokId: number, interviewerId: number, extra: Record<string, unknown> = {}) => ({
+    purokId,
+    houseNo: "21",
+    headOfFamily: "Private Name",
+    age: 38,
+    sex: "Male",
+    civilStatus: "Married",
+    occupation: "Secret Job",
+    interviewerId,
+    surveyDate: ANCHOR,
+    noContainersFound: false,
+    containers: [{ location: "outdoor", containerType: "Drum", total: 4, withCover: 1, withoutCover: 3, positive: 2, larvaeCount: 30, pupaeCount: 5 }],
+    ...extra,
+  });
+  type Me = { puroks: { id: number }[]; bhws: { id: number; name: string }[] };
+  const open = async (api: Api, barangay: string) => {
+    const phone = api.client().withBhwToken(tokenFor(api, barangay));
+    return { phone, me: (await phone.get("/api/bhw/me")).body as Me };
+  };
+  type Listed = { id: number; surveyDate: string; houseNo: string; purokId: number; purokName: string; interviewer: string; interviewerId: number; noContainersFound: boolean; clientSubmissionId: string | null; containers: { total: number; positive: number; larvaeCount: number }[] };
+  const list = async (phone: Client) => (await phone.get("/api/bhw/surveys")).body as Listed[];
+
+  it("needs a barangay link: no token, a wrong token and an officer sign-in are all refused", async () => {
+    const api = await startApi();
+    try {
+      expect((await api.client().get("/api/bhw/surveys")).status).toBe(401);
+      expect((await api.client().withBhwToken("not-a-token").get("/api/bhw/surveys")).status).toBe(401);
+      expect((await (await api.officer()).get("/api/bhw/surveys")).status).toBe(401);
+    } finally {
+      await api.close();
+    }
+  });
+
+  it("lists a submitted survey with the interviewer and the container rows, and nothing about the household", async () => {
+    const api = await startApi();
+    try {
+      const { phone, me } = await open(api, "Mabini");
+      const sent = await phone.post("/api/bhw/surveys", payload(me.puroks[0].id, me.bhws[0].id, { clientSubmissionId: "phone-list-0001" }));
+      const rows = await list(phone);
+      const row = rows.find((r) => r.id === sent.body.surveyId)!;
+      expect(row).toMatchObject({ houseNo: "21", surveyDate: ANCHOR, interviewer: me.bhws[0].name, interviewerId: me.bhws[0].id, noContainersFound: false, clientSubmissionId: "phone-list-0001" });
+      expect(row.containers).toEqual([{ location: "outdoor", containerType: "Drum", total: 4, withCover: 1, withoutCover: 3, positive: 2, larvaeCount: 30, pupaeCount: 5 }]);
+      expect(Object.keys(row).sort()).toEqual(["clientSubmissionId", "containers", "houseNo", "id", "interviewer", "interviewerId", "noContainersFound", "purokId", "purokName", "submittedAt", "surveyDate", "taskId"]);
+      // no personal detail anywhere in the answer, whatever the key is called
+      const text = JSON.stringify(rows);
+      for (const secret of ["Private Name", "Secret Job", "Married", "headOfFamily", "occupation", "civilStatus"]) expect(text, secret).not.toContain(secret);
+    } finally {
+      await api.close();
+    }
+  });
+
+  it("is the same on a second phone with the same link, and only holds this barangay's surveys", async () => {
+    const api = await startApi();
+    try {
+      const a = await open(api, "Mabini");
+      const b = await open(api, "Mabini");
+      const sent = await a.phone.post("/api/bhw/surveys", payload(a.me.puroks[0].id, a.me.bhws[0].id));
+      expect((await list(b.phone)).some((r) => r.id === sent.body.surveyId)).toBe(true); // the other phone sees it
+      expect(await list(b.phone)).toEqual(await list(a.phone));
+
+      const other = await open(api, "Peñafrancia");
+      expect((await list(other.phone)).some((r) => r.id === sent.body.surveyId)).toBe(false);
+      const barangayOf = (purokId: number) => (api.db.prepare("SELECT barangay_id AS b FROM purok WHERE id = ?").get(purokId) as { b: number }).b;
+      const mine = new Set((await list(a.phone)).map((r) => barangayOf(r.purokId)));
+      expect(mine.size).toBe(1);
+      expect(new Set((await list(other.phone)).map((r) => barangayOf(r.purokId))).has([...mine][0])).toBe(false);
+    } finally {
+      await api.close();
+    }
+  });
+
+  it("covers the last 30 days: 20 days ago is listed, 45 days ago is not", async () => {
+    const api = await startApi();
+    try {
+      const { phone, me } = await open(api, "Mabini");
+      const recent = await phone.post("/api/bhw/surveys", payload(me.puroks[0].id, me.bhws[0].id, { houseNo: "R1", surveyDate: addDays(ANCHOR, -20) }));
+      const old = await phone.post("/api/bhw/surveys", payload(me.puroks[0].id, me.bhws[0].id, { houseNo: "O1", surveyDate: addDays(ANCHOR, -45) }));
+      expect(recent.status).toBe(201);
+      expect(old.status).toBe(201); // saved, so the officer has it, but too old for this list
+      const ids = (await list(phone)).map((r) => r.id);
+      expect(ids).toContain(recent.body.surveyId);
+      expect(ids).not.toContain(old.body.surveyId);
+    } finally {
+      await api.close();
+    }
+  });
+
+  it("puts the newest submission first, and a survey sent twice (same clientSubmissionId) is listed once", async () => {
+    const api = await startApi();
+    try {
+      const { phone, me } = await open(api, "Mabini");
+      const first = await phone.post("/api/bhw/surveys", payload(me.puroks[0].id, me.bhws[0].id, { houseNo: "A", clientSubmissionId: "phone-list-first" }));
+      api.advance(60_000);
+      const second = await phone.post("/api/bhw/surveys", payload(me.puroks[0].id, me.bhws[0].id, { houseNo: "B", clientSubmissionId: "phone-list-second" }));
+      await phone.post("/api/bhw/surveys", payload(me.puroks[0].id, me.bhws[0].id, { houseNo: "B", clientSubmissionId: "phone-list-second" })); // a repeat
+      const ids = (await list(phone)).map((r) => r.id);
+      expect(ids.indexOf(second.body.surveyId)).toBeLessThan(ids.indexOf(first.body.surveyId));
+      expect(ids.filter((i) => i === second.body.surveyId)).toHaveLength(1);
+      expect(ids.length).toBe(new Set(ids).size);
+    } finally {
+      await api.close();
+    }
+  });
+
+  it("returns at most 200 surveys, the newest ones", async () => {
+    const api = await startApi();
+    try {
+      const { phone, me } = await open(api, "Mabini");
+      const barangayId = (api.db.prepare("SELECT id FROM barangay WHERE name = 'Mabini'").get() as { id: number }).id;
+      const base = new Date(`${ANCHOR}T10:00:00.000Z`).getTime();
+      let newest = 0;
+      for (let i = 0; i < 205; i++) newest = insertSurvey(api.db, { barangayId, purokId: me.puroks[0].id, houseNo: `H${i}`, surveyDate: ANCHOR, noContainersFound: true, submittedAt: new Date(base + i * 1000).toISOString() }, []);
+      const rows = await list(phone);
+      expect(rows).toHaveLength(200);
+      expect(rows[0].id).toBe(newest);
+      expect(rows.some((r) => r.houseNo === "H0")).toBe(false); // the oldest were cut off
     } finally {
       await api.close();
     }

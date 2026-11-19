@@ -182,7 +182,7 @@ export async function renderDashboard(root) {
   ].sort((a, b) => b.ts - a.ts).slice(0, 4);
 
   if (combined.length === 0) {
-    recentList.innerHTML = `<p style="font-size:13px; color:#6B7280; padding:12px 0;">No household forms recorded on this device yet.</p>`;
+    recentList.innerHTML = `<p style="font-size:13px; color:#6B7280; padding:12px 0;">No household forms recorded yet.</p>`;
   } else {
     combined.forEach((item, idx) => {
       const row = document.createElement('div');

@@ -5,11 +5,16 @@
 import { Router } from "express";
 import { getBarangay } from "../../db/repositories/barangayRepo";
 import { listBhwsOfBarangay } from "../../db/repositories/userRepo";
-import { listTasksForBarangay } from "../../db/repositories/workflowRepo";
+import { listRecentSurveysOfBarangay, listTasksForBarangay } from "../../db/repositories/workflowRepo";
+import { addDays, formatDate } from "../../util/dates";
 import * as v from "../../validate";
 import type { AppDeps } from "../deps";
 
-export function bhwRoutes({ db, changes }: AppDeps): Router {
+/** The list a BHW sees covers this many days back and at most this many surveys. */
+export const BHW_LIST_DAYS = 30;
+export const BHW_LIST_MAX = 200;
+
+export function bhwRoutes({ db, changes, ranking }: AppDeps): Router {
   const router = Router();
 
   router.get("/me", (req, res) => {
@@ -24,6 +29,13 @@ export function bhwRoutes({ db, changes }: AppDeps): Router {
 
   router.get("/tasks", (req, res) => {
     res.json(listTasksForBarangay(db, req.bhwBarangayId!));
+  });
+
+  // The barangay's recent surveys, so every phone that holds the barangay link sees the same list. Container counts and
+  // who did the interview, but never a household's details (see listRecentSurveysOfBarangay).
+  router.get("/surveys", (req, res) => {
+    const since = addDays(formatDate(ranking.now()), -BHW_LIST_DAYS);
+    res.json(listRecentSurveysOfBarangay(db, req.bhwBarangayId!, since, BHW_LIST_MAX));
   });
 
   router.post("/surveys", (req, res) => {

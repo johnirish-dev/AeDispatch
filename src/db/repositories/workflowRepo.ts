@@ -141,6 +141,67 @@ export interface NewContainer {
   pupaeCount?: number;
 }
 
+/** What a BHW sees of the barangay's recent surveys: where, when, by whom and the container counts. Never a household's details. */
+export interface BhwSurveyRow {
+  id: number;
+  clientSubmissionId: string | null;
+  taskId: number | null;
+  surveyDate: string;
+  submittedAt: string;
+  houseNo: string | null;
+  purokId: number | null;
+  purokName: string | null;
+  interviewerId: number | null;
+  interviewer: string | null;
+  noContainersFound: boolean;
+  containers: {
+    location: "indoor" | "outdoor" | "natural";
+    containerType: string;
+    total: number;
+    withCover: number;
+    withoutCover: number;
+    positive: number;
+    larvaeCount: number;
+    pupaeCount: number;
+  }[];
+}
+
+/**
+ * The surveys of one barangay with a survey date on or after `sinceDate`, newest submission first, at most `limit`.
+ * The head of the family, age, sex, civil status, occupation and the building details are NOT selected: the barangay
+ * link is shared, so this list must stay free of personal details.
+ */
+export function listRecentSurveysOfBarangay(db: Db, barangayId: number, sinceDate: string, limit: number): BhwSurveyRow[] {
+  const rows = db
+    .prepare(
+      `SELECT s.id, s.client_submission_id AS clientSubmissionId, s.task_id AS taskId, s.survey_date AS surveyDate,
+              s.submitted_at AS submittedAt, s.house_no AS houseNo, s.purok_id AS purokId, p.name AS purokName,
+              s.bhw_id AS interviewerId, COALESCE(h.display_name, s.surveyed_by) AS interviewer,
+              s.no_containers_found AS noContainersFound
+       FROM entomological_survey s
+       LEFT JOIN purok p ON p.id = s.purok_id
+       LEFT JOIN bhw h ON h.id = s.bhw_id
+       WHERE s.barangay_id = ? AND s.survey_date >= ?
+       ORDER BY s.submitted_at DESC, s.id DESC
+       LIMIT ?`,
+    )
+    .all(barangayId, sinceDate, limit) as (Omit<BhwSurveyRow, "noContainersFound" | "containers"> & { noContainersFound: number })[];
+  if (rows.length === 0) return [];
+
+  const byId = new Map<number, BhwSurveyRow["containers"]>();
+  const marks = rows.map(() => "?").join(",");
+  const containers = db
+    .prepare(
+      `SELECT survey_id AS surveyId, location, container_type AS containerType, total, with_cover AS withCover,
+              without_cover AS withoutCover, positive, larvae_count AS larvaeCount, pupae_count AS pupaeCount
+       FROM survey_container WHERE survey_id IN (${marks}) ORDER BY id`,
+    )
+    .all(...rows.map((r) => r.id)) as (BhwSurveyRow["containers"][number] & { surveyId: number })[];
+  for (const { surveyId, ...c } of containers) byId.set(surveyId, [...(byId.get(surveyId) ?? []), c]);
+
+  return rows.map((r) => ({ ...r, noContainersFound: r.noContainersFound === 1, containers: byId.get(r.id) ?? [] }));
+}
+
 /** The survey already saved under this submission id in this barangay, if any. */
 export function findSurveyBySubmission(db: Db, barangayId: number, clientSubmissionId: string): number | undefined {
   const r = db

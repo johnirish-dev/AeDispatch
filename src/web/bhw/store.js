@@ -1,5 +1,29 @@
 import { showModal } from './alerts.js';
 
+import { get } from '../shared/api.js';
+
+// The barangay's recent surveys as the server lists them (no household details). Kept apart from the full forms saved
+// on this phone so one never overwrites the other.
+const SERVER_KEY = 'aed.bhw.server';
+
+function serverRowToForm(r) {
+  const interviewer = r.interviewer || '';
+  const purokName = r.purokName || `Purok ${r.purokId}`;
+  const containers = Array.isArray(r.containers) ? r.containers : [];
+  return {
+    id: `db-${r.id}`,
+    surveyId: r.id,
+    surveyedAt: new Date(r.submittedAt).getTime() || new Date(r.surveyDate).getTime() || 0,
+    houseNo: r.houseNo,
+    purokId: r.purokId,
+    purokName,
+    headOfFamily: interviewer ? `Recorded by ${interviewer}` : 'Recorded household',
+    fromServer: true,
+    containers,
+    form: { houseNo: r.houseNo, purokId: r.purokId, purokName, surveyDate: r.surveyDate, surveyedBy: interviewer, noContainersFound: r.noContainersFound, containers, fromServer: true }
+  };
+}
+
 export const Store = {
   getKey(key, defaultVal) {
     try {
@@ -88,10 +112,27 @@ export const Store = {
     this.setKey('aed.bhw.synced', this.getSyncedForms().filter(s => String(s.id) !== String(id)));
   },
 
-  // The submitted forms shown are the ones saved on this phone. A server list (GET /api/bhw/surveys) is deferred:
-  // it would show the whole barangay's forms on every phone, but it needs care with household details.
+  /**
+   * The submitted forms: the full copies saved on this phone, plus the barangay's other recent surveys from the
+   * server (counts only), so several phones that share a barangay link see the same list. A survey that is on both
+   * keeps the full copy from this phone.
+   */
+  getSubmittedForms() {
+    const local = this.getSyncedForms();
+    const have = new Set(local.filter(f => f.surveyId !== undefined && f.surveyId !== null).map(f => String(f.surveyId)));
+    const others = this.getKey(SERVER_KEY, []).filter(r => !have.has(String(r.id))).map(serverRowToForm);
+    return [...local, ...others].sort((a, b) => (b.surveyedAt || 0) - (a.surveyedAt || 0));
+  },
+
+  /** Asks the server for the barangay's list. Offline or on an error it keeps the list it got last time. */
   async fetchServerSurveys() {
     this.cleanLegacySeed();
-    return this.getSyncedForms();
+    try {
+      const rows = await get('/api/bhw/surveys');
+      if (Array.isArray(rows)) this.setKey(SERVER_KEY, rows);
+    } catch (e) {
+      // No connection (or a link that is no longer valid): show what is already known.
+    }
+    return this.getSubmittedForms();
   }
 };

@@ -88,7 +88,7 @@ export async function renderMyForms(root, initialFilter) {
         screening: q.payload.screened === true ? 'Screened' : q.payload.screened === false ? 'Unscreened' : (q.payload.screening || '')
       }
     }));
-    const synced = Store.getSyncedForms().map(s => ({
+    const synced = Store.getSubmittedForms().map(s => ({
       id: s.id,
       kind: 'synced',
       houseNo: s.houseNo,
@@ -146,6 +146,8 @@ export async function renderMyForms(root, initialFilter) {
       <div class="bhw-detail-back-row">
         <button id="btn-back-forms" type="button" class="bhw-back-link">${icon('chevronLeft', 14, 2)} Back to My forms</button>
       </div>
+
+      ${d.fromServer ? `<p style="font-size:13px; color:#6B7280; margin:0 0 12px;">This form was recorded on another phone. Only the container counts are shown here; the household details stay on the phone that recorded it.</p>` : ''}
 
       <section class="bhw-panel bhw-form-detail-panel">
         ${renderResultCard({ totals, meta: `House ${item.houseNo || '—'} · ${item.purok}` })}
@@ -244,7 +246,7 @@ export async function renderMyForms(root, initialFilter) {
       <div class="bhw-topbar bhw-forms-topbar">
         <div>
           <h1 class="bhw-page-title">My forms</h1>
-          <p class="bhw-page-subtitle">${all.length} household ${all.length === 1 ? 'form' : 'forms'} recorded on this device</p>
+          <p class="bhw-page-subtitle">${all.length} household ${all.length === 1 ? 'form' : 'forms'} recorded in this barangay and on this phone</p>
         </div>
         <a href="#/survey" class="bhw-pill-btn primary">${icon('plus', 14)} New household survey</a>
       </div>
@@ -313,7 +315,7 @@ export async function renderMyForms(root, initialFilter) {
         listEl.innerHTML = `
           <div class="bhw-empty">
             <strong>No forms recorded yet</strong>
-            <p>Household surveys you save or submit on this device will show up here.</p>
+            <p>Household surveys you save or submit, and the barangay's recent submitted forms, will show up here.</p>
             <a href="#/survey" class="bhw-pill-btn primary sm">${icon('plus', 12)} New household survey</a>
           </div>`;
         return;
