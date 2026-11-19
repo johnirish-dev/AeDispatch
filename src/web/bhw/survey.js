@@ -81,6 +81,27 @@ function ensureOneRowPerLocation(containers) {
   return list;
 }
 
+// Who did the interview: chosen from the health workers registered for this barangay (the list comes from
+// /api/bhw/me) and sent as interviewerId. The device can be used by anyone, so the name is never assumed.
+function interviewers() {
+  return Array.isArray(window.bhwContext?.bhws) ? window.bhwContext.bhws : [];
+}
+
+function interviewerSelectHtml(id, selectedId) {
+  const list = interviewers();
+  if (list.length === 0) {
+    return `<select id="${id}" class="bhw-control" disabled><option>No health workers are registered for this barangay</option></select>`;
+  }
+  const options = list.map(b => `<option value="${b.id}" ${String(b.id) === String(selectedId) ? 'selected' : ''}>${esc(b.name)}</option>`).join('');
+  return `<select id="${id}" class="bhw-control"><option value="">Select who did the interview</option>${options}</select>`;
+}
+
+function pickInterviewer(state, value) {
+  const worker = interviewers().find(b => String(b.id) === String(value));
+  state.interviewerId = worker ? worker.id : '';
+  state.surveyedBy = worker ? worker.name : '';
+}
+
 export async function renderSurvey(root, draftId) {
   const me = window.bhwContext;
   let openTaskId = null;
@@ -113,8 +134,10 @@ export async function renderSurvey(root, draftId) {
     screening: '',
     rooms: '',
     surveyedBy: '',
+    interviewerId: '',
     surveyDate: '',
     noContainersFound: false,
+    completeTask: false,
     certified: false,
     containers: createDefaultContainers()
   };
@@ -133,6 +156,11 @@ export async function renderSurvey(root, draftId) {
       certified: false,
       containers: ensureOneRowPerLocation(savedSource.containers)
     };
+    // A draft or queued form made when the name was typed has no interviewer from the list: choose again.
+    if (!interviewers().some(b => String(b.id) === String(state.interviewerId))) {
+      state.interviewerId = '';
+      state.surveyedBy = '';
+    }
   }
 
   const saveCurrentDraft = (progress) => {
@@ -317,8 +345,8 @@ export async function renderSurvey(root, draftId) {
           </div>
           <div class="bhw-form-grid-2">
             <div class="bhw-field" data-field="surveyedBy">
-              <label for="f-surveyedBy-s1">Surveyed by (BHW Name) ${req}</label>
-              <input id="f-surveyedBy-s1" class="bhw-control" type="text" maxlength="100" autocomplete="off" placeholder="e.g. Maria L. Reyes" value="${esc(state.surveyedBy)}">
+              <label for="f-surveyedBy-s1">Interviewed by ${req}</label>
+              ${interviewerSelectHtml('f-surveyedBy-s1', state.interviewerId)}
             </div>
             <div class="bhw-field" data-field="surveyDate">
               <label for="f-surveyDate-s1">Date of survey ${req}</label>
@@ -338,7 +366,7 @@ export async function renderSurvey(root, draftId) {
 
       // Auto-capitalize names (handles hyphens, ñ, Ñ, accents)
       attachNameAutoCap(container.querySelector('#f-head'), val => { state.headOfFamily = val; });
-      attachNameAutoCap(container.querySelector('#f-surveyedBy-s1'), val => { state.surveyedBy = val; });
+      container.querySelector('#f-surveyedBy-s1').addEventListener('change', e => pickInterviewer(state, e.target.value));
       attachNameAutoCap(container.querySelector('#f-occ'), val => { state.occupation = val; });
       attachNameAutoCap(container.querySelector('#f-school'), val => { state.schoolName = val; });
 
@@ -363,7 +391,7 @@ export async function renderSurvey(root, draftId) {
         state.storeys = container.querySelector('#f-storeys').value;
         state.screening = container.querySelector('#f-screen').value;
         state.rooms = sanitizeNonNegativeInt(container.querySelector('#f-rooms').value, true);
-        state.surveyedBy = formatPersonName(container.querySelector('#f-surveyedBy-s1').value.trim());
+        pickInterviewer(state, container.querySelector('#f-surveyedBy-s1').value);
         const dateText = container.querySelector('#f-surveyDate-s1').value.trim();
         state.surveyDate = dmyToISO(dateText);
         return dateText;
@@ -385,7 +413,7 @@ export async function renderSurvey(root, draftId) {
         need('storeys', !state.storeys, 'Select the number of storeys.');
         need('screening', !state.screening, 'Select screening.');
         need('rooms', state.rooms === '', 'Enter the number of rooms.');
-        need('surveyedBy', !state.surveyedBy, BHW_STRINGS.errors.surveyedByEmpty);
+        need('surveyedBy', !state.interviewerId, BHW_STRINGS.errors.surveyedByEmpty);
         const dateErr = checkSurveyDate(dateText, state.surveyDate);
         if (dateErr) errs.push(['surveyDate', dateErr]);
         return errs;
@@ -740,9 +768,9 @@ export async function renderSurvey(root, draftId) {
             <div style="padding: 16px 18px;">
               <div class="bhw-form-grid-2">
                 <div class="bhw-field">
-                  <label>Surveyed by (BHW Full Name) <span class="req">*</span></label>
-                  <input id="f-surveyedBy" class="bhw-control" type="text" maxlength="100" autocomplete="off" placeholder="e.g. Maria L. Reyes" value="${state.surveyedBy}">
-                  <span style="font-size:11px; color:#6B7280; display:block; margin-top:4px;">Required because this barangay shares a single console account.</span>
+                  <label for="f-surveyedBy">Interviewed by <span class="req">*</span></label>
+                  ${interviewerSelectHtml('f-surveyedBy', state.interviewerId)}
+                  <span style="font-size:11px; color:#6B7280; display:block; margin-top:4px;">Choose who did this interview. This barangay shares one console link, so the name is picked each time.</span>
                 </div>
                 <div class="bhw-field">
                   <label>Date of survey <span class="req">*</span></label>
@@ -772,6 +800,14 @@ export async function renderSurvey(root, draftId) {
             </button>
             <strong style="font-size:13px;">I certify that the information provided in this Dengue Form 5 survey is true and correct.</strong>
           </div>
+
+          ${state.taskId ? `
+          <div class="bhw-switch-row bhw-cert-switch">
+            <button id="sw-complete" type="button" class="bhw-switch ${state.completeTask ? 'on' : ''}">
+              <div class="bhw-switch-knob"></div>
+            </button>
+            <strong style="font-size:13px;">Mark the officer's task as finished when I submit. Leave this off if you will add more households.</strong>
+          </div>` : ''}
         </section>
 
         <div id="submit-alert" class="bhw-alert-slot"></div>
@@ -785,7 +821,7 @@ export async function renderSurvey(root, draftId) {
         </div>
       `;
 
-      attachNameAutoCap(container.querySelector('#f-surveyedBy'), val => { state.surveyedBy = val; });
+      container.querySelector('#f-surveyedBy').addEventListener('change', e => pickInterviewer(state, e.target.value));
       onEditClear(() => clearInlineAlert(container.querySelector('#submit-alert')));
       bindDateInputs(container);
       container.querySelector('#f-surveyDate').addEventListener('input', e => { state.surveyDate = dmyToISO(e.target.value); });
@@ -794,9 +830,17 @@ export async function renderSurvey(root, draftId) {
       container.querySelector('#edit-s2').addEventListener('click', () => { state.step = 2; render(); });
 
       container.querySelector('#sw-cert').addEventListener('click', () => {
-        state.surveyedBy = formatPersonName(container.querySelector('#f-surveyedBy').value.trim());
+        pickInterviewer(state, container.querySelector('#f-surveyedBy').value);
         state.surveyDate = dmyToISO(container.querySelector('#f-surveyDate').value.trim());
         state.certified = !state.certified;
+        render();
+      });
+
+      // Only when this form belongs to a task the officer assigned.
+      container.querySelector('#sw-complete')?.addEventListener('click', () => {
+        pickInterviewer(state, container.querySelector('#f-surveyedBy').value);
+        state.surveyDate = dmyToISO(container.querySelector('#f-surveyDate').value.trim());
+        state.completeTask = !state.completeTask;
         render();
       });
 
@@ -806,19 +850,20 @@ export async function renderSurvey(root, draftId) {
       });
 
       container.querySelector('#btn-submit').addEventListener('click', async () => {
-        state.surveyedBy = formatPersonName(container.querySelector('#f-surveyedBy').value.trim());
+        pickInterviewer(state, container.querySelector('#f-surveyedBy').value);
         state.surveyDate = dmyToISO(container.querySelector('#f-surveyDate').value.trim());
 
         const nameField = container.querySelector('#f-surveyedBy').closest('.bhw-field');
         const dateField = container.querySelector('#f-surveyDate').closest('.bhw-field');
         [nameField, dateField].forEach(clearFieldError);
         const dateErr = checkSurveyDate(container.querySelector('#f-surveyDate').value.trim(), state.surveyDate);
-        if (!state.surveyedBy || dateErr) {
-          if (!state.surveyedBy) setFieldError(nameField, BHW_STRINGS.errors.surveyedByEmpty);
+        if (!state.interviewerId || dateErr) {
+          if (!state.interviewerId) setFieldError(nameField, BHW_STRINGS.errors.surveyedByEmpty);
+          showInlineAlert(container.querySelector('#submit-alert'), { type: 'error', title: 'Check these details', message: !state.interviewerId ? BHW_STRINGS.errors.surveyedByEmpty : dateErr });
           if (dateErr) setFieldError(dateField, dateErr);
-          const bad = !state.surveyedBy ? nameField : dateField;
+          const bad = !state.interviewerId ? nameField : dateField;
           bad.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          bad.querySelector('input:not([type="date"])').focus({ preventScroll: true });
+          bad.querySelector('select, input:not([type="date"])').focus({ preventScroll: true });
           return;
         }
 
@@ -840,7 +885,8 @@ export async function renderSurvey(root, draftId) {
           storeys: state.storeys === 'Single storey' ? 1 : state.storeys ? 2 : undefined,
           rooms: state.rooms !== '' ? Number(state.rooms) : undefined,
           screened: state.screening ? state.screening === 'Screened' : undefined,
-          surveyedBy: state.surveyedBy,
+          interviewerId: Number(state.interviewerId),
+          surveyedBy: state.surveyedBy, // for the paper view on this phone; the server uses interviewerId
           surveyDate: state.surveyDate,
           noContainersFound: Boolean(state.noContainersFound),
           containers: state.noContainersFound ? [] : validConts.map(c => ({
@@ -853,7 +899,7 @@ export async function renderSurvey(root, draftId) {
             larvaeCount: Number(c.larvaeCount),
             pupaeCount: Number(c.pupaeCount)
           })),
-          completeTask: false
+          completeTask: Boolean(state.taskId) && Boolean(state.completeTask)
         };
 
         try {
@@ -862,6 +908,7 @@ export async function renderSurvey(root, draftId) {
           const res = await post('/api/bhw/surveys', payload);
           if (draftId) Store.deleteDraft(draftId);
           if (foundQueueItem) Store.dequeue(foundQueueItem.id);
+          window.bhwTasks = null; // the next form asks the server again (a finished task must not be picked)
           Store.saveSyncedForm({
             id: `sync-${res?.surveyId || Date.now()}`,
             surveyId: res?.surveyId,
@@ -878,6 +925,12 @@ export async function renderSurvey(root, draftId) {
         } catch (err) {
           if (err.status === 400 && err.body?.error) {
             showInlineAlert(container.querySelector('#submit-alert'), { type: 'error', title: 'Could not submit', message: err.body.error });
+            container.querySelector('#btn-submit').disabled = false;
+            return;
+          }
+          if (err.status === 401) {
+            // A link that is no longer valid is not a lost connection: do not queue the form as if it were.
+            showInlineAlert(container.querySelector('#submit-alert'), { type: 'error', title: 'Link not valid', message: BHW_STRINGS.status.invalidLink });
             container.querySelector('#btn-submit').disabled = false;
             return;
           }

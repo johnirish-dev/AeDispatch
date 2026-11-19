@@ -1,5 +1,5 @@
 import { Store } from './store.js';
-import { setBearerToken, get } from '../shared/api.js';
+import { setBearerToken, setSignInPage, get } from '../shared/api.js';
 import { initRouter } from './router.js';
 import { initAutoSync } from './sync.js';
 
@@ -33,6 +33,8 @@ function initSidebarToggle() {
 }
 
 async function init() {
+  // The shared helper sends a 401 to the officer login. A BHW with a bad link must stay here and see the message.
+  setSignInPage(null);
   registerOfflineShell();
   initSidebarToggle();
 

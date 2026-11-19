@@ -6,6 +6,26 @@ import { Store } from './store.js';
 let syncInProgress = false;
 let listenersBound = false;
 
+// A phone often reports "online" before the connection works, so the first try can fail. After a failure
+// that may pass (no connection, a server error, too many requests) it tries again soon, then less often,
+// instead of waiting for the next one-minute check.
+const RETRY_DELAYS_MS = [2_000, 5_000, 15_000, 30_000, 60_000];
+let retryTimer = null;
+let consecutiveFailures = 0;
+
+function scheduleRetry() {
+  clearTimeout(retryTimer);
+  const delay = RETRY_DELAYS_MS[Math.min(consecutiveFailures, RETRY_DELAYS_MS.length - 1)];
+  consecutiveFailures++;
+  retryTimer = setTimeout(() => syncPendingForms(), delay);
+}
+
+function resetRetry() {
+  clearTimeout(retryTimer);
+  retryTimer = null;
+  consecutiveFailures = 0;
+}
+
 function makeClientSubmissionId() {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
   return `bhw-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -42,11 +62,13 @@ export async function syncPendingForms({ announce = false } = {}) {
 
   const queue = Store.getQueue().filter(item => !item.needsReview);
   if (queue.length === 0) {
+    resetRetry();
     return { sent: 0, remaining: Store.getQueue().length, skipped: false };
   }
 
   syncInProgress = true;
   let sent = 0;
+  let needsRetry = false;
   try {
     hideBanner('sync');
     for (const item of queue) {
@@ -66,13 +88,17 @@ export async function syncPendingForms({ announce = false } = {}) {
           lastError: errorMessage(err),
           needsReview: permanent
         });
-        // If the connection failed, stop and let the online/startup retry handle it.
+        if (!permanent) needsRetry = true;
+        // If the connection failed, stop here: the retry below tries again soon.
         if (!err?.status) break;
       }
     }
   } finally {
     syncInProgress = false;
   }
+
+  if (needsRetry) scheduleRetry();
+  else resetRetry();
 
   const remaining = Store.getQueue().length;
   if (announce && remaining === 0 && sent > 0) {

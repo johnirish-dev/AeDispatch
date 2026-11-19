@@ -1,4 +1,3 @@
-import { get } from '../shared/api.js';
 import { showModal } from './alerts.js';
 
 export const Store = {
@@ -89,28 +88,10 @@ export const Store = {
     this.setKey('aed.bhw.synced', this.getSyncedForms().filter(s => String(s.id) !== String(id)));
   },
 
+  // The submitted forms shown are the ones saved on this phone. A server list (GET /api/bhw/surveys) is deferred:
+  // it would show the whole barangay's forms on every phone, but it needs care with household details.
   async fetchServerSurveys() {
     this.cleanLegacySeed();
-    try {
-      const rows = await get('/api/bhw/surveys');
-      if (Array.isArray(rows)) {
-        const mapped = rows.map(r => ({
-          id: `db-${r.id}`,
-          surveyId: r.id,
-          surveyedAt: r.createdAt ? new Date(r.createdAt).getTime() : new Date(r.surveyDate).getTime(),
-          houseNo: r.houseNo,
-          purokId: r.purokId,
-          purokName: r.purokName || `Purok ${r.purokId}`,
-          headOfFamily: r.headOfFamily || 'Recorded Household',
-          containers: r.containers || [],
-          form: r
-        }));
-        this.setKey('aed.bhw.synced', mapped);
-        return mapped;
-      }
-    } catch (e) {
-      // Route not merged yet or offline; fall back to local synced list
-    }
     return this.getSyncedForms();
   }
 };
