@@ -4,7 +4,7 @@ import { getBarangay, listBarangays } from "../src/db/repositories/barangayRepo"
 import { latestScoreFor, latestScores } from "../src/db/repositories/scoreRepo";
 import { listEvents } from "../src/db/repositories/workflowRepo";
 import { hashPhone } from "../src/db/security";
-import { createBhw, listBhws } from "../src/db/repositories/userRepo";
+import { listBhws } from "../src/db/repositories/userRepo";
 import { AppError } from "../src/errors";
 import { DataChanges } from "../src/services/changes";
 import { RankingService } from "../src/services/ranking";
@@ -169,7 +169,7 @@ describe("BHW survey", () => {
         headOfFamily: "Secret Name",
         age: 41,
         sex: "Female",
-        interviewerId: bhw.id,
+        surveyedBy: bhw.displayName,
         surveyDate: ANCHOR,
         noContainersFound: false,
         containers: [{ location: "natural", containerType: "Jar", total: 50, withCover: 0, withoutCover: 50, positive: 45, larvaeCount: 100, pupaeCount: 5 }],
@@ -194,33 +194,29 @@ describe("BHW survey", () => {
     expect(saved.location).toBe("natural");
   });
 
-  it("the interviewer is chosen on the form: any BHW of the barangay can be named, and is the one recorded", () => {
+  it("records the name typed on the form: anyone can do the survey, no registered worker is needed", () => {
     const { db, changes } = setup();
     const { bhw, body } = survey(db);
-    const second = createBhw(db, { displayName: "Second Worker", barangayId: bhw.barangayId });
-    const { surveyId } = changes.submitSurvey(bhw.barangayId, { ...body, interviewerId: second });
-    const saved = db.prepare("SELECT bhw_id AS bhwId, surveyed_by AS by FROM entomological_survey WHERE id = ?").get(surveyId) as { bhwId: number; by: string };
-    expect(saved).toEqual({ bhwId: second, by: "Second Worker" });
-    expect(listEvents(db, 1)[0].text).toContain("Second Worker");
+    const { surveyId } = changes.submitSurvey(bhw.barangayId, { ...body, surveyedBy: "  Substitute   Worker " });
+    const saved = db.prepare("SELECT bhw_id AS bhwId, surveyed_by AS by FROM entomological_survey WHERE id = ?").get(surveyId) as { bhwId: number | null; by: string };
+    expect(saved).toEqual({ bhwId: null, by: "Substitute Worker" }); // trimmed, spaces collapsed, tied to no account
+    expect(listEvents(db, 1)[0].text).toContain("Substitute Worker");
+    expect(listEvents(db, 1)[0].text).not.toContain("Secret Name");
   });
 
   it.each([
-    ["no interviewer", undefined],
-    ["an interviewer that does not exist", 99999],
-    ["not a number", "Rico"],
-  ])("rejects %s, and saves nothing", (_label, interviewerId) => {
+    ["missing", undefined],
+    ["blank", "   "],
+    ["not text", 12345],
+    ["longer than 100 characters", "x".repeat(101)],
+  ])("rejects a surveyed-by name that is %s, and saves nothing", (_label, surveyedBy) => {
     const { db, changes } = setup();
     const { bhw, body } = survey(db);
     const surveys = count(db, "entomological_survey");
-    expect(() => changes.submitSurvey(bhw.barangayId, { ...body, interviewerId })).toThrow();
+    const scores = count(db, "threat_score");
+    expectError(() => changes.submitSurvey(bhw.barangayId, { ...body, surveyedBy }), 400, /surveyedBy/);
     expect(count(db, "entomological_survey")).toBe(surveys);
-  });
-
-  it("rejects an interviewer who belongs to another barangay", () => {
-    const { db, changes } = setup();
-    const { bhw, body } = survey(db);
-    const jun = bhwOf(db, "Jun M. Santos"); // Peñafrancia, not Mabini
-    expectError(() => changes.submitSurvey(bhw.barangayId, { ...body, interviewerId: jun.id }), 400, /list of this barangay/);
+    expect(count(db, "threat_score")).toBe(scores);
   });
 
   describe("a repeated send (retry or automatic sync)", () => {
@@ -248,7 +244,7 @@ describe("BHW survey", () => {
       const jun = bhwOf(db, "Jun M. Santos");
       const taskId = (db.prepare("SELECT id FROM field_task WHERE bhw_id = ? AND status = 'new'").get(jun.id) as { id: number }).id;
       const purokId = getBarangay(db, jun.barangayId)!.puroks[0].id;
-      const base = { purokId, houseNo: "3", interviewerId: jun.id, surveyDate: ANCHOR, noContainersFound: true, taskId, clientSubmissionId: ID, completeTask: true };
+      const base = { purokId, houseNo: "3", surveyedBy: jun.displayName, surveyDate: ANCHOR, noContainersFound: true, taskId, clientSubmissionId: ID, completeTask: true };
       const first = changes.submitSurvey(jun.barangayId, base);
       const afterFirst = totals(db);
       const again = changes.submitSurvey(jun.barangayId, { ...base, houseNo: "99", completeTask: false });
@@ -262,7 +258,7 @@ describe("BHW survey", () => {
       const { db, changes } = setup();
       const rico = survey(db); // Mabini
       const jun = bhwOf(db, "Jun M. Santos");
-      const junBody = { ...rico.body, purokId: getBarangay(db, jun.barangayId)!.puroks[0].id, interviewerId: jun.id };
+      const junBody = { ...rico.body, purokId: getBarangay(db, jun.barangayId)!.puroks[0].id, surveyedBy: jun.displayName };
       const a = changes.submitSurvey(rico.bhw.barangayId, { ...rico.body, clientSubmissionId: ID });
       const b = changes.submitSurvey(jun.barangayId, { ...junBody, clientSubmissionId: ID });
       expect(b.duplicate).toBeUndefined();
@@ -320,7 +316,7 @@ describe("BHW survey", () => {
     const jun = bhwOf(db, "Jun M. Santos");
     const taskId = (db.prepare("SELECT id FROM field_task WHERE bhw_id = ? AND status = 'new'").get(jun.id) as { id: number }).id;
     const purokId = getBarangay(db, jun.barangayId)!.puroks[0].id;
-    const base = { purokId, houseNo: "3", interviewerId: jun.id, surveyDate: ANCHOR, noContainersFound: true, taskId };
+    const base = { purokId, houseNo: "3", surveyedBy: jun.displayName, surveyDate: ANCHOR, noContainersFound: true, taskId };
     changes.submitSurvey(jun.barangayId, base);
     expect((db.prepare("SELECT status FROM field_task WHERE id = ?").get(taskId) as { status: string }).status).toBe("in_progress");
     changes.submitSurvey(jun.barangayId, { ...base, houseNo: "4", completeTask: true });

@@ -81,27 +81,6 @@ function ensureOneRowPerLocation(containers) {
   return list;
 }
 
-// Who did the interview: chosen from the health workers registered for this barangay (the list comes from
-// /api/bhw/me) and sent as interviewerId. The device can be used by anyone, so the name is never assumed.
-function interviewers() {
-  return Array.isArray(window.bhwContext?.bhws) ? window.bhwContext.bhws : [];
-}
-
-function interviewerSelectHtml(id, selectedId) {
-  const list = interviewers();
-  if (list.length === 0) {
-    return `<select id="${id}" class="bhw-control" disabled><option>No health workers are registered for this barangay</option></select>`;
-  }
-  const options = list.map(b => `<option value="${b.id}" ${String(b.id) === String(selectedId) ? 'selected' : ''}>${esc(b.name)}</option>`).join('');
-  return `<select id="${id}" class="bhw-control"><option value="">Select who did the interview</option>${options}</select>`;
-}
-
-function pickInterviewer(state, value) {
-  const worker = interviewers().find(b => String(b.id) === String(value));
-  state.interviewerId = worker ? worker.id : '';
-  state.surveyedBy = worker ? worker.name : '';
-}
-
 export async function renderSurvey(root, draftId) {
   const me = window.bhwContext;
   let openTaskId = null;
@@ -134,7 +113,6 @@ export async function renderSurvey(root, draftId) {
     screening: '',
     rooms: '',
     surveyedBy: '',
-    interviewerId: '',
     surveyDate: '',
     noContainersFound: false,
     completeTask: false,
@@ -156,11 +134,6 @@ export async function renderSurvey(root, draftId) {
       certified: false,
       containers: ensureOneRowPerLocation(savedSource.containers)
     };
-    // A draft or queued form made when the name was typed has no interviewer from the list: choose again.
-    if (!interviewers().some(b => String(b.id) === String(state.interviewerId))) {
-      state.interviewerId = '';
-      state.surveyedBy = '';
-    }
   }
 
   const saveCurrentDraft = (progress) => {
@@ -345,8 +318,8 @@ export async function renderSurvey(root, draftId) {
           </div>
           <div class="bhw-form-grid-2">
             <div class="bhw-field" data-field="surveyedBy">
-              <label for="f-surveyedBy-s1">Interviewed by ${req}</label>
-              ${interviewerSelectHtml('f-surveyedBy-s1', state.interviewerId)}
+              <label for="f-surveyedBy-s1">Surveyed by (BHW Name) ${req}</label>
+              <input id="f-surveyedBy-s1" class="bhw-control" type="text" maxlength="100" autocomplete="off" placeholder="e.g. Maria L. Reyes" value="${esc(state.surveyedBy)}">
             </div>
             <div class="bhw-field" data-field="surveyDate">
               <label for="f-surveyDate-s1">Date of survey ${req}</label>
@@ -366,7 +339,7 @@ export async function renderSurvey(root, draftId) {
 
       // Auto-capitalize names (handles hyphens, ñ, Ñ, accents)
       attachNameAutoCap(container.querySelector('#f-head'), val => { state.headOfFamily = val; });
-      container.querySelector('#f-surveyedBy-s1').addEventListener('change', e => pickInterviewer(state, e.target.value));
+      attachNameAutoCap(container.querySelector('#f-surveyedBy-s1'), val => { state.surveyedBy = val; });
       attachNameAutoCap(container.querySelector('#f-occ'), val => { state.occupation = val; });
       attachNameAutoCap(container.querySelector('#f-school'), val => { state.schoolName = val; });
 
@@ -391,7 +364,7 @@ export async function renderSurvey(root, draftId) {
         state.storeys = container.querySelector('#f-storeys').value;
         state.screening = container.querySelector('#f-screen').value;
         state.rooms = sanitizeNonNegativeInt(container.querySelector('#f-rooms').value, true);
-        pickInterviewer(state, container.querySelector('#f-surveyedBy-s1').value);
+        state.surveyedBy = formatPersonName(container.querySelector('#f-surveyedBy-s1').value.trim());
         const dateText = container.querySelector('#f-surveyDate-s1').value.trim();
         state.surveyDate = dmyToISO(dateText);
         return dateText;
@@ -413,7 +386,7 @@ export async function renderSurvey(root, draftId) {
         need('storeys', !state.storeys, 'Select the number of storeys.');
         need('screening', !state.screening, 'Select screening.');
         need('rooms', state.rooms === '', 'Enter the number of rooms.');
-        need('surveyedBy', !state.interviewerId, BHW_STRINGS.errors.surveyedByEmpty);
+        need('surveyedBy', !state.surveyedBy, BHW_STRINGS.errors.surveyedByEmpty);
         const dateErr = checkSurveyDate(dateText, state.surveyDate);
         if (dateErr) errs.push(['surveyDate', dateErr]);
         return errs;
@@ -768,9 +741,9 @@ export async function renderSurvey(root, draftId) {
             <div style="padding: 16px 18px;">
               <div class="bhw-form-grid-2">
                 <div class="bhw-field">
-                  <label for="f-surveyedBy">Interviewed by <span class="req">*</span></label>
-                  ${interviewerSelectHtml('f-surveyedBy', state.interviewerId)}
-                  <span style="font-size:11px; color:#6B7280; display:block; margin-top:4px;">Choose who did this interview. This barangay shares one console link, so the name is picked each time.</span>
+                  <label for="f-surveyedBy">Surveyed by (BHW Full Name) <span class="req">*</span></label>
+                  <input id="f-surveyedBy" class="bhw-control" type="text" maxlength="100" autocomplete="off" placeholder="e.g. Maria L. Reyes" value="${esc(state.surveyedBy)}">
+                  <span style="font-size:11px; color:#6B7280; display:block; margin-top:4px;">Required because this barangay shares a single console account.</span>
                 </div>
                 <div class="bhw-field">
                   <label>Date of survey <span class="req">*</span></label>
@@ -821,7 +794,7 @@ export async function renderSurvey(root, draftId) {
         </div>
       `;
 
-      container.querySelector('#f-surveyedBy').addEventListener('change', e => pickInterviewer(state, e.target.value));
+      attachNameAutoCap(container.querySelector('#f-surveyedBy'), val => { state.surveyedBy = val; });
       onEditClear(() => clearInlineAlert(container.querySelector('#submit-alert')));
       bindDateInputs(container);
       container.querySelector('#f-surveyDate').addEventListener('input', e => { state.surveyDate = dmyToISO(e.target.value); });
@@ -830,7 +803,7 @@ export async function renderSurvey(root, draftId) {
       container.querySelector('#edit-s2').addEventListener('click', () => { state.step = 2; render(); });
 
       container.querySelector('#sw-cert').addEventListener('click', () => {
-        pickInterviewer(state, container.querySelector('#f-surveyedBy').value);
+        state.surveyedBy = formatPersonName(container.querySelector('#f-surveyedBy').value.trim());
         state.surveyDate = dmyToISO(container.querySelector('#f-surveyDate').value.trim());
         state.certified = !state.certified;
         render();
@@ -838,7 +811,7 @@ export async function renderSurvey(root, draftId) {
 
       // Only when this form belongs to a task the officer assigned.
       container.querySelector('#sw-complete')?.addEventListener('click', () => {
-        pickInterviewer(state, container.querySelector('#f-surveyedBy').value);
+        state.surveyedBy = formatPersonName(container.querySelector('#f-surveyedBy').value.trim());
         state.surveyDate = dmyToISO(container.querySelector('#f-surveyDate').value.trim());
         state.completeTask = !state.completeTask;
         render();
@@ -850,18 +823,18 @@ export async function renderSurvey(root, draftId) {
       });
 
       container.querySelector('#btn-submit').addEventListener('click', async () => {
-        pickInterviewer(state, container.querySelector('#f-surveyedBy').value);
+        state.surveyedBy = formatPersonName(container.querySelector('#f-surveyedBy').value.trim());
         state.surveyDate = dmyToISO(container.querySelector('#f-surveyDate').value.trim());
 
         const nameField = container.querySelector('#f-surveyedBy').closest('.bhw-field');
         const dateField = container.querySelector('#f-surveyDate').closest('.bhw-field');
         [nameField, dateField].forEach(clearFieldError);
         const dateErr = checkSurveyDate(container.querySelector('#f-surveyDate').value.trim(), state.surveyDate);
-        if (!state.interviewerId || dateErr) {
-          if (!state.interviewerId) setFieldError(nameField, BHW_STRINGS.errors.surveyedByEmpty);
-          showInlineAlert(container.querySelector('#submit-alert'), { type: 'error', title: 'Check these details', message: !state.interviewerId ? BHW_STRINGS.errors.surveyedByEmpty : dateErr });
+        if (!state.surveyedBy || dateErr) {
+          if (!state.surveyedBy) setFieldError(nameField, BHW_STRINGS.errors.surveyedByEmpty);
+          showInlineAlert(container.querySelector('#submit-alert'), { type: 'error', title: 'Check these details', message: !state.surveyedBy ? BHW_STRINGS.errors.surveyedByEmpty : dateErr });
           if (dateErr) setFieldError(dateField, dateErr);
-          const bad = !state.interviewerId ? nameField : dateField;
+          const bad = !state.surveyedBy ? nameField : dateField;
           bad.scrollIntoView({ behavior: 'smooth', block: 'center' });
           bad.querySelector('select, input:not([type="date"])').focus({ preventScroll: true });
           return;
@@ -885,8 +858,7 @@ export async function renderSurvey(root, draftId) {
           storeys: state.storeys === 'Single storey' ? 1 : state.storeys ? 2 : undefined,
           rooms: state.rooms !== '' ? Number(state.rooms) : undefined,
           screened: state.screening ? state.screening === 'Screened' : undefined,
-          interviewerId: Number(state.interviewerId),
-          surveyedBy: state.surveyedBy, // for the paper view on this phone; the server uses interviewerId
+          surveyedBy: state.surveyedBy,
           surveyDate: state.surveyDate,
           noContainersFound: Boolean(state.noContainersFound),
           containers: state.noContainersFound ? [] : validConts.map(c => ({

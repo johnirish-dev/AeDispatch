@@ -17,7 +17,7 @@ function serverRowToForm(r) {
     houseNo: r.houseNo,
     purokId: r.purokId,
     purokName,
-    headOfFamily: interviewer ? `Recorded by ${interviewer}` : 'Recorded household',
+    headOfFamily: interviewer ? `Surveyed by ${interviewer}` : 'Recorded household',
     fromServer: true,
     containers,
     form: { houseNo: r.houseNo, purokId: r.purokId, purokName, surveyDate: r.surveyDate, surveyedBy: interviewer, noContainersFound: r.noContainersFound, containers, fromServer: true }

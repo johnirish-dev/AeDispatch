@@ -151,7 +151,7 @@ export interface BhwSurveyRow {
   houseNo: string | null;
   purokId: number | null;
   purokName: string | null;
-  interviewerId: number | null;
+  /** The name typed on the form (or the registered worker's name for older rows). */
   interviewer: string | null;
   noContainersFound: boolean;
   containers: {
@@ -176,7 +176,7 @@ export function listRecentSurveysOfBarangay(db: Db, barangayId: number, sinceDat
     .prepare(
       `SELECT s.id, s.client_submission_id AS clientSubmissionId, s.task_id AS taskId, s.survey_date AS surveyDate,
               s.submitted_at AS submittedAt, s.house_no AS houseNo, s.purok_id AS purokId, p.name AS purokName,
-              s.bhw_id AS interviewerId, COALESCE(h.display_name, s.surveyed_by) AS interviewer,
+              COALESCE(s.surveyed_by, h.display_name) AS interviewer,
               s.no_containers_found AS noContainersFound
        FROM entomological_survey s
        LEFT JOIN purok p ON p.id = s.purok_id

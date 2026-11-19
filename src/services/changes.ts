@@ -33,7 +33,6 @@ import {
   insertSurvey,
   updateTaskStatus,
 } from "../db/repositories/workflowRepo";
-import { getBhw } from "../db/repositories/userRepo";
 import { AppError, isUniqueViolation } from "../errors";
 import * as v from "../validate";
 import { formatDate } from "../util/dates";
@@ -67,8 +66,8 @@ export interface SurveySubmission {
   storeys?: unknown;
   rooms?: unknown;
   screened?: unknown;
-  /** The BHW who did the interview: one of the barangay's registered BHWs, chosen on the form. */
-  interviewerId: unknown;
+  /** Who did the survey: the name typed on the form (the device can be used by anyone, so no person is assumed). */
+  surveyedBy: unknown;
   /** Optional. Made by the phone for each submission: the same value sent again is not saved twice. */
   clientSubmissionId?: unknown;
   surveyDate: unknown;
@@ -240,9 +239,7 @@ export class DataChanges {
       throw new AppError(400, "That purok is not in your barangay.");
     }
 
-    const interviewerId = v.int(s.interviewerId, "interviewerId", 1, Number.MAX_SAFE_INTEGER);
-    const interviewer = getBhw(this.db, interviewerId);
-    if (!interviewer || interviewer.barangayId !== barangayId) throw new AppError(400, "Choose who did the interview from the list of this barangay's BHWs.");
+    const surveyedBy = v.text(s.surveyedBy, "surveyedBy", 100);
 
     let taskId: number | null = null;
     let taskStatus: TaskStatus | null = null;
@@ -256,7 +253,6 @@ export class DataChanges {
     const noContainersFound = s.noContainersFound === undefined ? false : v.bool(s.noContainersFound, "noContainersFound");
     const containers = this.checkContainers(s.containers, noContainersFound);
 
-    const surveyedBy = interviewer.displayName;
     const houseNo = v.text(s.houseNo, "houseNo", 40);
     const submittedAt = this.ranking.now().toISOString();
     const markDone = s.completeTask === true;
@@ -266,7 +262,6 @@ export class DataChanges {
         this.db,
         {
           taskId,
-          bhwId: interviewer.id,
           barangayId,
           purokId,
           houseNo,
@@ -294,7 +289,7 @@ export class DataChanges {
         else if (taskStatus === "new") updateTaskStatus(this.db, taskId, "in_progress", submittedAt);
       }
       // The log never carries the household details: only who, where, when.
-      addEvent(this.db, "submission", `${interviewer.displayName} submitted a survey for ${this.barangayName(barangayId)} (${purok.name})`, submittedAt);
+      addEvent(this.db, "submission", `${surveyedBy} submitted a survey for ${this.barangayName(barangayId)} (${purok.name})`, submittedAt);
       return id;
     })();
 

@@ -114,7 +114,8 @@ describe("BHW token and resident session", () => {
     expect((await api.client().withBhwToken("not-a-token").get("/api/bhw/me")).status).toBe(401);
     const res = await api.client().withBhwToken(tokenFor(api, "Peñafrancia")).get("/api/bhw/me");
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ barangay: { name: "Peñafrancia" }, bhws: [{ name: "Jun M. Santos", team: "Team B" }] });
+    expect(res.body).toMatchObject({ barangay: { name: "Peñafrancia" } });
+    expect(res.body.bhws).toBeUndefined(); // no list of workers: the name is typed on the form
     expect(res.body.puroks.length).toBeGreaterThan(0);
     expect(res.body.name).toBeUndefined(); // the token opens a barangay, not a person
   });
@@ -451,13 +452,13 @@ describe("confirm and reject", () => {
 // ---- a submitted survey changes the ranking -----------------------------------------
 
 describe("BHW survey through the API", () => {
-  const survey = (purokId: number, interviewerId: number, extra: Record<string, unknown> = {}) => ({
+  const survey = (purokId: number, extra: Record<string, unknown> = {}) => ({
     purokId,
     houseNo: "21",
     headOfFamily: "Private Name",
     age: 38,
     sex: "Male",
-    interviewerId,
+    surveyedBy: "Rico T. Mendoza",
     surveyDate: ANCHOR,
     noContainersFound: false,
     containers: [{ location: "outdoor", containerType: "Drum", total: 50, withCover: 0, withoutCover: 50, positive: 45, larvaeCount: 300, pupaeCount: 20 }],
@@ -472,9 +473,9 @@ describe("BHW survey through the API", () => {
       const mabini = before.barangays.find((b) => b.name === "Mabini")!;
 
       const rico = api.client().withBhwToken(tokenFor(api, "Mabini"));
-      const me = (await rico.get("/api/bhw/me")).body as { puroks: { id: number }[]; bhws: { id: number }[] };
+      const me = (await rico.get("/api/bhw/me")).body as { puroks: { id: number }[] };
       api.lines.length = 0;
-      const res = await rico.post("/api/bhw/surveys", survey(me.puroks[0].id, me.bhws[0].id));
+      const res = await rico.post("/api/bhw/surveys", survey(me.puroks[0].id));
       expect(res.status).toBe(201);
       expect(api.lines.some((l) => /^\[rescore\] 1 barangays in \d+\.\d ms \(survey submitted\)$/.test(l))).toBe(true);
 
@@ -503,8 +504,8 @@ describe("BHW survey through the API", () => {
     const api = await startApi();
     try {
       const rico = api.client().withBhwToken(tokenFor(api, "Mabini"));
-      const me = (await rico.get("/api/bhw/me")).body as { puroks: { id: number }[]; bhws: { id: number }[] };
-      const body = survey(me.puroks[0].id, me.bhws[0].id, { clientSubmissionId: "queue-1700000000000" });
+      const me = (await rico.get("/api/bhw/me")).body as { puroks: { id: number }[] };
+      const body = survey(me.puroks[0].id, { clientSubmissionId: "queue-1700000000000" });
       const surveys = count(api.db, "entomological_survey");
       const events = count(api.db, "event_log");
       const first = await rico.post("/api/bhw/surveys", body);
@@ -515,7 +516,7 @@ describe("BHW survey through the API", () => {
       expect(again.body).toEqual({ surveyId: first.body.surveyId, duplicate: true });
       expect(count(api.db, "entomological_survey")).toBe(surveys + 1);
       expect(count(api.db, "event_log")).toBe(events + 1);
-      const bad = await rico.post("/api/bhw/surveys", survey(me.puroks[0].id, me.bhws[0].id, { clientSubmissionId: "x" }));
+      const bad = await rico.post("/api/bhw/surveys", survey(me.puroks[0].id, { clientSubmissionId: "x" }));
       expect(bad.status).toBe(400);
     } finally {
       await api.close();
@@ -526,14 +527,14 @@ describe("BHW survey through the API", () => {
     const api = await startApi();
     try {
       const rico = api.client().withBhwToken(tokenFor(api, "Mabini"));
-      const me = (await rico.get("/api/bhw/me")).body as { puroks: { id: number }[]; bhws: { id: number }[] };
+      const me = (await rico.get("/api/bhw/me")).body as { puroks: { id: number }[] };
       const surveys = count(api.db, "entomological_survey");
       const scores = count(api.db, "threat_score");
-      const bad = await rico.post("/api/bhw/surveys", survey(me.puroks[0].id, me.bhws[0].id, { containers: [{ location: "indoor", containerType: "Jar", total: 3, withCover: 1, withoutCover: 1, positive: 0 }] }));
+      const bad = await rico.post("/api/bhw/surveys", survey(me.puroks[0].id, { containers: [{ location: "indoor", containerType: "Jar", total: 3, withCover: 1, withoutCover: 1, positive: 0 }] }));
       expect(bad.status).toBe(400);
       expect(bad.body.error).toMatch(/with cover \+ without cover/);
       const tagasPurok = (api.db.prepare("SELECT p.id FROM purok p JOIN barangay b ON b.id = p.barangay_id WHERE b.name = 'Tagas' LIMIT 1").get() as { id: number }).id;
-      const other = await rico.post("/api/bhw/surveys", survey(tagasPurok, me.bhws[0].id));
+      const other = await rico.post("/api/bhw/surveys", survey(tagasPurok));
       expect(other.status).toBe(400);
       expect(count(api.db, "entomological_survey")).toBe(surveys);
       expect(count(api.db, "threat_score")).toBe(scores);
@@ -547,8 +548,8 @@ describe("BHW survey through the API", () => {
     try {
       const officer = await api.officer();
       const rico = api.client().withBhwToken(tokenFor(api, "Mabini"));
-      const me = (await rico.get("/api/bhw/me")).body as { puroks: { id: number }[]; bhws: { id: number }[] };
-      const { body } = await rico.post("/api/bhw/surveys", survey(me.puroks[0].id, me.bhws[0].id));
+      const me = (await rico.get("/api/bhw/me")).body as { puroks: { id: number }[] };
+      const { body } = await rico.post("/api/bhw/surveys", survey(me.puroks[0].id));
       const one = await officer.get(`/api/officer/findings/${body.surveyId}`);
       expect(one.status).toBe(200);
       expect(one.body).toMatchObject({ headOfFamily: "Private Name", houseNo: "21", barangayName: "Mabini" });
@@ -736,9 +737,9 @@ describe("restart", () => {
       const officer = await api.officer();
       // change things first: a survey and a case import
       const rico = api.client().withBhwToken(tokenFor(api, "Mabini"));
-      const me = (await rico.get("/api/bhw/me")).body as { puroks: { id: number }[]; bhws: { id: number }[] };
+      const me = (await rico.get("/api/bhw/me")).body as { puroks: { id: number }[] };
       await rico.post("/api/bhw/surveys", {
-        purokId: me.puroks[0].id, houseNo: "1", interviewerId: me.bhws[0].id, surveyDate: ANCHOR, noContainersFound: false,
+        purokId: me.puroks[0].id, houseNo: "1", surveyedBy: "Rico T. Mendoza", surveyDate: ANCHOR, noContainersFound: false,
         containers: [{ location: "indoor", containerType: "Jar", total: 10, withCover: 0, withoutCover: 10, positive: 9 }],
       });
       await officer.post("/api/officer/cases/import", { text: dataFile("cases_valid.csv") });
@@ -771,7 +772,7 @@ describe("restart", () => {
 // ---- the list of recent surveys a BHW sees (the same on every phone that holds the barangay link) ----
 
 describe("the BHW's list of recent surveys", () => {
-  const payload = (purokId: number, interviewerId: number, extra: Record<string, unknown> = {}) => ({
+  const payload = (purokId: number, extra: Record<string, unknown> = {}) => ({
     purokId,
     houseNo: "21",
     headOfFamily: "Private Name",
@@ -779,18 +780,18 @@ describe("the BHW's list of recent surveys", () => {
     sex: "Male",
     civilStatus: "Married",
     occupation: "Secret Job",
-    interviewerId,
+    surveyedBy: "Typed Surveyor",
     surveyDate: ANCHOR,
     noContainersFound: false,
     containers: [{ location: "outdoor", containerType: "Drum", total: 4, withCover: 1, withoutCover: 3, positive: 2, larvaeCount: 30, pupaeCount: 5 }],
     ...extra,
   });
-  type Me = { puroks: { id: number }[]; bhws: { id: number; name: string }[] };
+  type Me = { puroks: { id: number }[] };
   const open = async (api: Api, barangay: string) => {
     const phone = api.client().withBhwToken(tokenFor(api, barangay));
     return { phone, me: (await phone.get("/api/bhw/me")).body as Me };
   };
-  type Listed = { id: number; surveyDate: string; houseNo: string; purokId: number; purokName: string; interviewer: string; interviewerId: number; noContainersFound: boolean; clientSubmissionId: string | null; containers: { total: number; positive: number; larvaeCount: number }[] };
+  type Listed = { id: number; surveyDate: string; houseNo: string; purokId: number; purokName: string; interviewer: string; noContainersFound: boolean; clientSubmissionId: string | null; containers: { total: number; positive: number; larvaeCount: number }[] };
   const list = async (phone: Client) => (await phone.get("/api/bhw/surveys")).body as Listed[];
 
   it("needs a barangay link: no token, a wrong token and an officer sign-in are all refused", async () => {
@@ -804,16 +805,16 @@ describe("the BHW's list of recent surveys", () => {
     }
   });
 
-  it("lists a submitted survey with the interviewer and the container rows, and nothing about the household", async () => {
+  it("lists a submitted survey with who did it (the typed name) and the container rows, and nothing about the household", async () => {
     const api = await startApi();
     try {
       const { phone, me } = await open(api, "Mabini");
-      const sent = await phone.post("/api/bhw/surveys", payload(me.puroks[0].id, me.bhws[0].id, { clientSubmissionId: "phone-list-0001" }));
+      const sent = await phone.post("/api/bhw/surveys", payload(me.puroks[0].id, { clientSubmissionId: "phone-list-0001" }));
       const rows = await list(phone);
       const row = rows.find((r) => r.id === sent.body.surveyId)!;
-      expect(row).toMatchObject({ houseNo: "21", surveyDate: ANCHOR, interviewer: me.bhws[0].name, interviewerId: me.bhws[0].id, noContainersFound: false, clientSubmissionId: "phone-list-0001" });
+      expect(row).toMatchObject({ houseNo: "21", surveyDate: ANCHOR, interviewer: "Typed Surveyor", noContainersFound: false, clientSubmissionId: "phone-list-0001" });
       expect(row.containers).toEqual([{ location: "outdoor", containerType: "Drum", total: 4, withCover: 1, withoutCover: 3, positive: 2, larvaeCount: 30, pupaeCount: 5 }]);
-      expect(Object.keys(row).sort()).toEqual(["clientSubmissionId", "containers", "houseNo", "id", "interviewer", "interviewerId", "noContainersFound", "purokId", "purokName", "submittedAt", "surveyDate", "taskId"]);
+      expect(Object.keys(row).sort()).toEqual(["clientSubmissionId", "containers", "houseNo", "id", "interviewer", "noContainersFound", "purokId", "purokName", "submittedAt", "surveyDate", "taskId"]);
       // no personal detail anywhere in the answer, whatever the key is called
       const text = JSON.stringify(rows);
       for (const secret of ["Private Name", "Secret Job", "Married", "headOfFamily", "occupation", "civilStatus"]) expect(text, secret).not.toContain(secret);
@@ -827,7 +828,7 @@ describe("the BHW's list of recent surveys", () => {
     try {
       const a = await open(api, "Mabini");
       const b = await open(api, "Mabini");
-      const sent = await a.phone.post("/api/bhw/surveys", payload(a.me.puroks[0].id, a.me.bhws[0].id));
+      const sent = await a.phone.post("/api/bhw/surveys", payload(a.me.puroks[0].id));
       expect((await list(b.phone)).some((r) => r.id === sent.body.surveyId)).toBe(true); // the other phone sees it
       expect(await list(b.phone)).toEqual(await list(a.phone));
 
@@ -846,8 +847,8 @@ describe("the BHW's list of recent surveys", () => {
     const api = await startApi();
     try {
       const { phone, me } = await open(api, "Mabini");
-      const recent = await phone.post("/api/bhw/surveys", payload(me.puroks[0].id, me.bhws[0].id, { houseNo: "R1", surveyDate: addDays(ANCHOR, -20) }));
-      const old = await phone.post("/api/bhw/surveys", payload(me.puroks[0].id, me.bhws[0].id, { houseNo: "O1", surveyDate: addDays(ANCHOR, -45) }));
+      const recent = await phone.post("/api/bhw/surveys", payload(me.puroks[0].id, { houseNo: "R1", surveyDate: addDays(ANCHOR, -20) }));
+      const old = await phone.post("/api/bhw/surveys", payload(me.puroks[0].id, { houseNo: "O1", surveyDate: addDays(ANCHOR, -45) }));
       expect(recent.status).toBe(201);
       expect(old.status).toBe(201); // saved, so the officer has it, but too old for this list
       const ids = (await list(phone)).map((r) => r.id);
@@ -862,10 +863,10 @@ describe("the BHW's list of recent surveys", () => {
     const api = await startApi();
     try {
       const { phone, me } = await open(api, "Mabini");
-      const first = await phone.post("/api/bhw/surveys", payload(me.puroks[0].id, me.bhws[0].id, { houseNo: "A", clientSubmissionId: "phone-list-first" }));
+      const first = await phone.post("/api/bhw/surveys", payload(me.puroks[0].id, { houseNo: "A", clientSubmissionId: "phone-list-first" }));
       api.advance(60_000);
-      const second = await phone.post("/api/bhw/surveys", payload(me.puroks[0].id, me.bhws[0].id, { houseNo: "B", clientSubmissionId: "phone-list-second" }));
-      await phone.post("/api/bhw/surveys", payload(me.puroks[0].id, me.bhws[0].id, { houseNo: "B", clientSubmissionId: "phone-list-second" })); // a repeat
+      const second = await phone.post("/api/bhw/surveys", payload(me.puroks[0].id, { houseNo: "B", clientSubmissionId: "phone-list-second" }));
+      await phone.post("/api/bhw/surveys", payload(me.puroks[0].id, { houseNo: "B", clientSubmissionId: "phone-list-second" })); // a repeat
       const ids = (await list(phone)).map((r) => r.id);
       expect(ids.indexOf(second.body.surveyId)).toBeLessThan(ids.indexOf(first.body.surveyId));
       expect(ids.filter((i) => i === second.body.surveyId)).toHaveLength(1);
