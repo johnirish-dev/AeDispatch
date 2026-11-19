@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BHW Field Console - AeDispatch</title>
+  <link rel="stylesheet" href="../shared/tokens.css">
+  <link rel="stylesheet" href="../shared/base.css">
+  <link rel="stylesheet" href="../shared/components.css">
+  <link rel="stylesheet" href="./bhw.css">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <meta name="theme-color" content="#155E44">
+  <link rel="icon" type="image/svg+xml" href="../shared/favicon.svg">
+</head>
+<body class="bhw-app">
+  <aside class="bhw-sidebar" id="sidebar">
+    <div class="bhw-brand-row">
+      <div class="bhw-brand">
+        <img src="../shared/logo.svg" alt="AeDispatch" width="28" height="28">
+        <div class="bhw-brand-text">
+          <strong>AeDispatch</strong>
+          <span>BHW Field Console</span>
+        </div>
+      </div>
+      <button
+        id="sidebar-toggle"
+        class="bhw-collapse-btn"
+        type="button"
+        data-tooltip="Collapse sidebar"
+        aria-label="Collapse sidebar"
+        aria-expanded="true"
+      >
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <rect x="1.5" y="2.5" width="13" height="11" rx="2" stroke="currentColor" stroke-width="1.3"/>
+          <line x1="5.5" y1="2.5" x2="5.5" y2="13.5" stroke="currentColor" stroke-width="1.3"/>
+        </svg>
+      </button>
+    </div>
+
+    <nav class="bhw-nav-list">
+      <a
+        href="#/"
+        class="bhw-nav-link active"
+        id="nav-home"
+        data-tooltip="Home dashboard"
+      >
+        <span class="bhw-nav-left">
+          <span class="bhw-nav-icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M2.5 6.8L8 2.3L13.5 6.8V13.2C13.5 13.6 13.2 14 12.7 14H3.3C2.8 14 2.5 13.6 2.5 13.2V6.8Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+          </svg></span>
+          <span class="bhw-link-text">Home</span>
+        </span>
+      </a>
+      <a
+        href="#/survey"
+        class="bhw-nav-link"
+        id="nav-survey"
+        data-tooltip="New entomological survey"
+      >
+        <span class="bhw-nav-left">
+          <span class="bhw-nav-icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <rect x="3" y="2" width="10" height="12" rx="1.8" stroke="currentColor" stroke-width="1.4"/>
+            <line x1="5.5" y1="5.5" x2="10.5" y2="5.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+            <line x1="5.5" y1="8" x2="10.5" y2="8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+            <line x1="5.5" y1="10.5" x2="8.5" y2="10.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+          </svg></span>
+          <span class="bhw-link-text">Survey</span>
+        </span>
+      </a>
+      <a
+        href="#/forms"
+        class="bhw-nav-link"
+        id="nav-forms"
+        data-tooltip="My recorded forms"
+      >
+        <span class="bhw-nav-left">
+          <span class="bhw-nav-icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M2.2 4.2C2.2 3.5 2.7 3 3.4 3H6.2L7.6 4.5H12.6C13.3 4.5 13.8 5 13.8 5.7V11.8C13.8 12.5 13.3 13 12.6 13H3.4C2.7 13 2.2 12.5 2.2 11.8V4.2Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+          </svg></span>
+          <span class="bhw-link-text">My forms</span>
+        </span>
+      </a>
+    </nav>
+
+    <div
+      class="bhw-user-card"
+      data-tooltip="Barangay account"
+    >
+      <div class="bhw-avatar" id="user-avatar">BP</div>
+      <div class="bhw-user-info">
+        <strong id="user-brgy">Barangay Peñafrancia</strong>
+        <span>Barangay account</span>
+      </div>
+    </div>
+  </aside>
+
+  <div class="bhw-mobile-account" aria-label="Barangay account">
+    <div class="bhw-avatar" id="mobile-user-avatar">BP</div>
+    <div class="bhw-mobile-account-text">
+      <strong id="mobile-user-brgy">Barangay Peñafrancia</strong>
+      <span>Barangay account</span>
+    </div>
+  </div>
+
+  <nav class="bhw-bottom-nav" aria-label="Mobile Navigation">
+    <a href="#/" id="mob-nav-home" class="active" title="Go to Home Dashboard" aria-label="Home">
+      <span class="bhw-mobile-nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M2.5 6.8L8 2.3L13.5 6.8V13.2C13.5 13.6 13.2 14 12.7 14H3.3C2.8 14 2.5 13.6 2.5 13.2V6.8Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg></span>
+      <span class="bhw-mobile-nav-label">Home</span>
+    </a>
+    <a href="#/survey" id="mob-nav-survey" title="Start or Edit Survey" aria-label="Survey">
+      <span class="bhw-mobile-nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="3" y="2" width="10" height="12" rx="1.8" stroke="currentColor" stroke-width="1.4"/><line x1="5.5" y1="5.5" x2="10.5" y2="5.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><line x1="5.5" y1="8" x2="10.5" y2="8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><line x1="5.5" y1="10.5" x2="8.5" y2="10.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
+      <span class="bhw-mobile-nav-label">Survey</span>
+    </a>
+    <a href="#/forms" id="mob-nav-forms" title="View Recorded Forms" aria-label="My forms">
+      <span class="bhw-mobile-nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M2.2 4.2C2.2 3.5 2.7 3 3.4 3H6.2L7.6 4.5H12.6C13.3 4.5 13.8 5 13.8 5.7V11.8C13.8 12.5 13.3 13 12.6 13H3.4C2.7 13 2.2 12.5 2.2 11.8V4.2Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg></span>
+      <span class="bhw-mobile-nav-label">My forms</span>
+    </a>
+  </nav>
+
+  <div class="bhw-content">
+    <div id="bhw-banner-slot" class="bhw-banner-slot"></div>
+    <main id="app-root" class="bhw-main"></main>
+  </div>
+
+  <script type="module" src="./index.js"></script>
+</body>
+</html>
