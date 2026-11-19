@@ -1,0 +1,16 @@
+{
+  "name": "AeDispatch BHW Field Console",
+  "short_name": "AeDispatch BHW",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#EAEEEC",
+  "theme_color": "#155E44",
+  "icons": [
+    {
+      "src": "../shared/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
