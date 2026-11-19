@@ -70,7 +70,7 @@ export interface SurveySubmission {
   /** The BHW who did the interview: one of the barangay's registered BHWs, chosen on the form. */
   interviewerId: unknown;
   /** Optional. Made by the phone for each submission: the same value sent again is not saved twice. */
-  submissionId?: unknown;
+  clientSubmissionId?: unknown;
   surveyDate: unknown;
   noContainersFound?: unknown;
   containers?: unknown;
@@ -81,7 +81,7 @@ export interface SurveySubmission {
 /** 8 to 64 letters, digits, dashes or underscores (a UUID fits). */
 function checkSubmissionId(value: unknown): string {
   if (typeof value !== "string" || !/^[A-Za-z0-9_-]{8,64}$/.test(value)) {
-    throw new AppError(400, "submissionId must be 8 to 64 letters, digits, - or _.");
+    throw new AppError(400, "clientSubmissionId must be 8 to 64 letters, digits, - or _.");
   }
   return value;
 }
@@ -225,7 +225,7 @@ export class DataChanges {
   submitSurvey(barangayId: number, s: SurveySubmission): { surveyId: number; duplicate?: true } {
     // A repeated send (a retry after a lost reply, or an automatic sync) is answered with the first result
     // and changes nothing: no second survey, no second log line, no second re-score.
-    const submissionId = s.submissionId === undefined || s.submissionId === null ? null : checkSubmissionId(s.submissionId);
+    const submissionId = s.clientSubmissionId === undefined || s.clientSubmissionId === null ? null : checkSubmissionId(s.clientSubmissionId);
     if (submissionId !== null) {
       const existing = findSurveyBySubmission(this.db, barangayId, submissionId);
       if (existing !== undefined) return { surveyId: existing, duplicate: true };

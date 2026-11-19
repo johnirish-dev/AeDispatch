@@ -497,12 +497,12 @@ describe("BHW survey through the API", () => {
     }
   });
 
-  it("a repeated send with the same submissionId is saved once: 201 the first time, then 200 with the same survey id", async () => {
+  it("a repeated send with the same clientSubmissionId is saved once: 201 the first time, then 200 with the same survey id", async () => {
     const api = await startApi();
     try {
       const rico = api.client().withBhwToken(tokenFor(api, "Mabini"));
       const me = (await rico.get("/api/bhw/me")).body as { puroks: { id: number }[]; bhws: { id: number }[] };
-      const body = survey(me.puroks[0].id, me.bhws[0].id, { submissionId: "queue-1700000000000" });
+      const body = survey(me.puroks[0].id, me.bhws[0].id, { clientSubmissionId: "queue-1700000000000" });
       const surveys = count(api.db, "entomological_survey");
       const events = count(api.db, "event_log");
       const first = await rico.post("/api/bhw/surveys", body);
@@ -513,7 +513,7 @@ describe("BHW survey through the API", () => {
       expect(again.body).toEqual({ surveyId: first.body.surveyId, duplicate: true });
       expect(count(api.db, "entomological_survey")).toBe(surveys + 1);
       expect(count(api.db, "event_log")).toBe(events + 1);
-      const bad = await rico.post("/api/bhw/surveys", survey(me.puroks[0].id, me.bhws[0].id, { submissionId: "x" }));
+      const bad = await rico.post("/api/bhw/surveys", survey(me.puroks[0].id, me.bhws[0].id, { clientSubmissionId: "x" }));
       expect(bad.status).toBe(400);
     } finally {
       await api.close();

@@ -235,10 +235,10 @@ describe("BHW survey", () => {
     it("is saved once: the same survey id comes back, and nothing else changes (no second survey, log line or re-score)", () => {
       const { db, changes } = setup();
       const { bhw, body } = survey(db);
-      const first = changes.submitSurvey(bhw.barangayId, { ...body, submissionId: ID });
+      const first = changes.submitSurvey(bhw.barangayId, { ...body, clientSubmissionId: ID });
       expect(first.duplicate).toBeUndefined();
       const afterFirst = totals(db);
-      const again = changes.submitSurvey(bhw.barangayId, { ...body, submissionId: ID });
+      const again = changes.submitSurvey(bhw.barangayId, { ...body, clientSubmissionId: ID });
       expect(again).toEqual({ surveyId: first.surveyId, duplicate: true });
       expect(totals(db)).toEqual(afterFirst);
     });
@@ -248,7 +248,7 @@ describe("BHW survey", () => {
       const jun = bhwOf(db, "Jun M. Santos");
       const taskId = (db.prepare("SELECT id FROM field_task WHERE bhw_id = ? AND status = 'new'").get(jun.id) as { id: number }).id;
       const purokId = getBarangay(db, jun.barangayId)!.puroks[0].id;
-      const base = { purokId, houseNo: "3", interviewerId: jun.id, surveyDate: ANCHOR, noContainersFound: true, taskId, submissionId: ID, completeTask: true };
+      const base = { purokId, houseNo: "3", interviewerId: jun.id, surveyDate: ANCHOR, noContainersFound: true, taskId, clientSubmissionId: ID, completeTask: true };
       const first = changes.submitSurvey(jun.barangayId, base);
       const afterFirst = totals(db);
       const again = changes.submitSurvey(jun.barangayId, { ...base, houseNo: "99", completeTask: false });
@@ -263,8 +263,8 @@ describe("BHW survey", () => {
       const rico = survey(db); // Mabini
       const jun = bhwOf(db, "Jun M. Santos");
       const junBody = { ...rico.body, purokId: getBarangay(db, jun.barangayId)!.puroks[0].id, interviewerId: jun.id };
-      const a = changes.submitSurvey(rico.bhw.barangayId, { ...rico.body, submissionId: ID });
-      const b = changes.submitSurvey(jun.barangayId, { ...junBody, submissionId: ID });
+      const a = changes.submitSurvey(rico.bhw.barangayId, { ...rico.body, clientSubmissionId: ID });
+      const b = changes.submitSurvey(jun.barangayId, { ...junBody, clientSubmissionId: ID });
       expect(b.duplicate).toBeUndefined();
       expect(b.surveyId).not.toBe(a.surveyId);
     });
@@ -280,6 +280,19 @@ describe("BHW survey", () => {
     });
 
     it.each([
+      ["a UUID (crypto.randomUUID)", "3f2b8c1e-5d4a-4e7b-9c3d-1a2b3c4d5e6f"],
+      ["the fallback id the BHW app makes without crypto.randomUUID", "bhw-1731974400000-k3j9x2m1q8z"],
+      ["the shortest allowed id", "abcdefgh"],
+      ["the longest allowed id", "x".repeat(64)],
+    ])("accepts %s", (_label, clientSubmissionId) => {
+      const { db, changes } = setup();
+      const { bhw, body } = survey(db);
+      const first = changes.submitSurvey(bhw.barangayId, { ...body, clientSubmissionId });
+      expect(first.duplicate).toBeUndefined();
+      expect(changes.submitSurvey(bhw.barangayId, { ...body, clientSubmissionId })).toEqual({ surveyId: first.surveyId, duplicate: true });
+    });
+
+    it.each([
       ["too short", "abc123"],
       ["too long", "x".repeat(65)],
       ["bad characters", "phone 0001 ab!"],
@@ -288,15 +301,15 @@ describe("BHW survey", () => {
       const { db, changes } = setup();
       const { bhw, body } = survey(db);
       const before = totals(db);
-      expectError(() => changes.submitSurvey(bhw.barangayId, { ...body, submissionId }), 400, /submissionId/);
+      expectError(() => changes.submitSurvey(bhw.barangayId, { ...body, clientSubmissionId: submissionId }), 400, /clientSubmissionId/);
       expect(totals(db)).toEqual(before);
     });
 
     it("a refused survey does not use up its id: the corrected one is saved", () => {
       const { db, changes } = setup();
       const { bhw, body } = survey(db);
-      expectError(() => changes.submitSurvey(bhw.barangayId, { ...body, submissionId: ID, houseNo: " " }), 400, /houseNo/);
-      const ok = changes.submitSurvey(bhw.barangayId, { ...body, submissionId: ID });
+      expectError(() => changes.submitSurvey(bhw.barangayId, { ...body, clientSubmissionId: ID, houseNo: " " }), 400, /houseNo/);
+      const ok = changes.submitSurvey(bhw.barangayId, { ...body, clientSubmissionId: ID });
       expect(ok.duplicate).toBeUndefined();
       expect(count(db, "entomological_survey")).toBeGreaterThan(0);
     });
