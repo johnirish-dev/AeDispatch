@@ -23,6 +23,7 @@ import {
   insertDailyAnswer,
   insertHouseholdReport,
   symptomChecksOn,
+  symptomWarningChecksOn,
 } from "../db/repositories/signalRepo";
 import {
   NewContainer,
@@ -101,6 +102,21 @@ const ANONYMOUS_DAILY_SHARE = 0.05;
 
 export function anonymousDailyCap(population: number): number {
   return Math.max(ANONYMOUS_DAILY_MINIMUM, Math.ceil(population * ANONYMOUS_DAILY_SHARE));
+}
+
+// The symptom check itself is unlimited for the person using it. Only the COUNT that reaches the score is limited:
+// a symptom check with warning signs is counted at most this many times per barangay per day, so one person (or one
+// script) cannot push the symptom factor to its maximum in a day.
+//
+// PROVISIONAL, TO REVIEW (decided 2026-11-22, see the deviations log, "Symptom-check limits"): 0.1 percent of the
+// barangay's residents, never fewer than 3. With the full symptom signal at 4 warning checks per 1,000 residents over
+// 7 days, this means the factor can be maxed out in 3 to 4 days of full use in every sample barangay (not prevented,
+// only slowed). Not fitted to real data; revisit with real data, or if the sample barangays change.
+const WARNING_CHECK_MINIMUM = 3;
+const WARNING_CHECK_SHARE = 0.001;
+
+export function warningCheckCap(population: number): number {
+  return Math.max(WARNING_CHECK_MINIMUM, Math.ceil(population * WARNING_CHECK_SHARE));
 }
 
 export class DataChanges {
@@ -197,13 +213,18 @@ export class DataChanges {
   recordSymptomCheck(barangayId: number, warningSigns: unknown): void {
     const barangay = getBarangay(this.db, barangayId);
     if (!barangay) throw new AppError(404, "Barangay not found.");
+    const warning = v.bool(warningSigns, "warningSigns");
     if (symptomChecksOn(this.db, barangayId, this.today()) >= anonymousDailyCap(barangay.population)) {
       throw new AppError(429, "Today's symptom-check limit for this barangay has been reached.");
+    }
+    if (warning && symptomWarningChecksOn(this.db, barangayId, this.today()) >= warningCheckCap(barangay.population)) {
+      // Refused, not saved: the person has their result on the phone; only the count to the system is limited.
+      throw new AppError(429, "Today's warning-sign limit for this barangay has been reached.");
     }
     addSymptomCheck(this.db, {
       barangayId,
       date: this.today(),
-      warningSigns: v.bool(warningSigns, "warningSigns"),
+      warningSigns: warning,
       at: this.ranking.now().toISOString(),
     });
     this.ranking.rescore([barangayId], { reason: "symptom check" });

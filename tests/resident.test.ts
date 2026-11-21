@@ -2,11 +2,12 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { openDatabase } from "../src/db/connection";
 import { runMigrations } from "../src/db/migrate";
 import { MIGRATIONS } from "../src/db/migrations";
-import { addAnonymousAnswer, addSymptomCheck, answerTotals } from "../src/db/repositories/signalRepo";
+import { addAnonymousAnswer, addSymptomCheck, answerTotals, symptomWarningChecksOn } from "../src/db/repositories/signalRepo";
 import { latestScoreFor } from "../src/db/repositories/scoreRepo";
-import { anonymousDailyCap } from "../src/services/changes";
+import { anonymousDailyCap, warningCheckCap } from "../src/services/changes";
 import { RAIN_FAVORABLE_FROM, TEMP_FAVORABLE_FROM, weatherOf } from "../src/services/residentViews";
 import { PIN_MAX_TRIES, PIN_RESEND_SECONDS, PIN_TTL_SECONDS } from "../src/services/residentAuth";
+import { addDays } from "../src/util/dates";
 import { ANCHOR, Api, startApi } from "./apiHelpers";
 import { count } from "./helpers";
 
@@ -58,6 +59,73 @@ describe("the weather shown to residents (weatherOf)", () => {
   it("gives null when the stored summary does not have the weather", () => {
     for (const bad of [null, undefined, {}, { asOf: "2026-11-19" }, { asOf: "2026-11-19", details: {} }, summary({ rainTotalMm: "90" }), summary({ rainDays: NaN }), summary({}, 5)]) {
       expect(weatherOf(bad), JSON.stringify(bad)).toBeNull();
+    }
+  });
+});
+
+describe("the warning-sign cap on the symptom check", () => {
+  it("is 0.1 percent of the residents, never fewer than 3", () => {
+    for (const [population, cap] of [[1, 3], [100, 3], [1650, 3], [1980, 3], [2310, 3], [2900, 3], [3000, 3], [3001, 4], [3560, 4], [4000, 4], [4001, 5], [4120, 5], [6850, 7], [10000, 10]]) {
+      expect(warningCheckCap(population), `${population} residents`).toBe(cap);
+    }
+  });
+
+  it("counts warning-sign checks only up to the cap per barangay per day: the extra ones are refused and change nothing", async () => {
+    const api = await startApi();
+    try {
+      const id = (api.db.prepare("SELECT id FROM barangay WHERE name = 'Busay'").get() as { id: number }).id;
+      const other = (api.db.prepare("SELECT id FROM barangay WHERE name = 'Mabini'").get() as { id: number }).id;
+      const cap = warningCheckCap((api.db.prepare("SELECT population FROM barangay WHERE id = ?").get(id) as { population: number }).population);
+      expect(cap).toBe(3); // Busay has 2,310 residents
+      const send = (barangay: number, warningSigns: boolean) => api.client().post(`/api/resident/barangays/${barangay}/symptom-check`, { warningSigns });
+      const warned = () => symptomWarningChecksOn(api.db, id, ANCHOR);
+
+      for (let i = warned(); i < cap; i++) expect((await send(id, true)).status).toBe(201);
+      expect(warned()).toBe(cap);
+
+      const scoreBefore = latestScoreFor(api.db, id)!.score;
+      const scoreRows = count(api.db, "threat_score");
+      const refused = await send(id, true);
+      expect(refused.status).toBe(429);
+      expect(refused.body.error).toMatch(/warning-sign limit/);
+      expect(warned()).toBe(cap); // not counted
+      expect(count(api.db, "threat_score")).toBe(scoreRows); // and no re-score
+      expect(latestScoreFor(api.db, id)!.score).toBe(scoreBefore);
+
+      expect((await send(id, false)).status).toBe(201); // a check without warning signs is still accepted (it never moves the score)
+      expect(warned()).toBe(cap);
+      expect((await send(other, true)).status).toBe(201); // another barangay has its own cap
+    } finally {
+      await api.close();
+    }
+  });
+
+  it("starts again the next day", async () => {
+    const api = await startApi();
+    try {
+      const id = (api.db.prepare("SELECT id FROM barangay WHERE name = 'Busay'").get() as { id: number }).id;
+      const send = () => api.client().post(`/api/resident/barangays/${id}/symptom-check`, { warningSigns: true });
+      for (let i = symptomWarningChecksOn(api.db, id, ANCHOR); i < warningCheckCap(2310); i++) await send();
+      expect((await send()).status).toBe(429);
+      api.advance(24 * 60 * 60 * 1000);
+      expect((await send()).status).toBe(201);
+      expect(symptomWarningChecksOn(api.db, id, addDays(ANCHOR, 1))).toBe(1);
+    } finally {
+      await api.close();
+    }
+  });
+
+  it("a refused check with warning signs does not use up the checks without them, and an invalid value is still a 400", async () => {
+    const api = await startApi();
+    try {
+      const id = (api.db.prepare("SELECT id FROM barangay WHERE name = 'Mabini'").get() as { id: number }).id;
+      for (let i = symptomWarningChecksOn(api.db, id, ANCHOR); i < warningCheckCap(1980); i++) addSymptomCheck(api.db, { barangayId: id, date: ANCHOR, warningSigns: true });
+      const post = (body: unknown) => api.client().post(`/api/resident/barangays/${id}/symptom-check`, body);
+      expect((await post({ warningSigns: true })).status).toBe(429);
+      expect((await post({ warningSigns: false })).status).toBe(201);
+      expect((await post({ warningSigns: "yes" })).status).toBe(400); // checked before any limit
+    } finally {
+      await api.close();
     }
   });
 });

@@ -142,6 +142,44 @@ function setBarangay(id) {
   store.set("barangay", id);
 }
 
+function applyBarangayChange(next) {
+  setBarangay(next);
+  renderHome();
+  renderAlerts();
+}
+
+// "Change your barangay?" Your daily check-in and symptom check count for the barangay you choose, so the change
+// is confirmed first. Keeping the current one is the safe choice: it has the focus, Escape and the backdrop mean "keep".
+function askToChangeBarangay(oldId, nextId) {
+  const select = $("barangay-select");
+  const overlay = $("bgy-confirm");
+  const oldName = state.barangays.find((b) => b.id === oldId)?.name ?? "";
+  const newName = state.barangays.find((b) => b.id === nextId)?.name ?? select.options[select.selectedIndex]?.textContent ?? "";
+  $("bgy-confirm-title").textContent = t("bgy.confirmTitle");
+  $("bgy-confirm-body").textContent = t("bgy.confirmBody", { old: oldName, new: newName });
+  $("bgy-confirm-yes").textContent = t("bgy.confirmYes");
+  $("bgy-confirm-no").textContent = t("bgy.confirmNo", { old: oldName });
+  overlay.hidden = false;
+  $("bgy-confirm-no").focus();
+
+  const close = (change) => {
+    overlay.hidden = true;
+    document.removeEventListener("keydown", onKey);
+    if (change) applyBarangayChange(nextId);
+    else select.value = String(oldId);
+    select.focus();
+  };
+  const onKey = (event) => {
+    if (event.key === "Escape") close(false);
+  };
+  document.addEventListener("keydown", onKey);
+  $("bgy-confirm-yes").onclick = () => close(true);
+  $("bgy-confirm-no").onclick = () => close(false);
+  overlay.onclick = (event) => {
+    if (event.target === overlay) close(false);
+  };
+}
+
 function renderBarangaySelect() {
   const select = $("barangay-select");
   select.replaceChildren();
@@ -721,7 +759,19 @@ async function evaluateSymptoms() {
   const syms = $$(".sym-check:checked").length;
   lastSymptomResult = warns > 0 ? "warn" : syms > 0 ? "sym" : "none";
   renderSymptomResult();
-  if (state.barangayId !== null) await service.recordSymptomCheck(state.barangayId, warns > 0);
+  await countSymptomCheck(warns > 0);
+}
+
+// The check itself is unlimited: the person always gets their result. Only the COUNT that goes to the system is
+// limited, to once a day on this phone for a check with warning signs and once a day for a check without (the server
+// has its own daily limit per barangay as well). The mark is per phone, not per barangay, so changing barangay does not
+// give an extra count. A count that could not be sent (no connection, or the server's limit) does not use up the day.
+async function countSymptomCheck(warning) {
+  if (state.barangayId === null) return;
+  const key = warning ? "symptomWarnCounted" : "symptomPlainCounted";
+  if (store.get(key) === todayText()) return;
+  const result = await service.recordSymptomCheck(state.barangayId, warning);
+  if (result.saved) store.set(key, todayText());
 }
 
 async function submitReport(event) {
@@ -796,9 +846,13 @@ function wire() {
 
   $("barangay-select").addEventListener("change", (event) => {
     const value = event.target.value;
-    setBarangay(value === "__none" ? null : Number(value));
-    renderHome();
-    renderAlerts();
+    const next = value === "__none" ? null : Number(value);
+    // Changing an existing barangay asks first, so it is never done by accident.
+    if (typeof state.barangayId === "number" && next !== state.barangayId) {
+      askToChangeBarangay(state.barangayId, next);
+      return;
+    }
+    applyBarangayChange(next);
   });
   $("open-alerts-btn").addEventListener("click", () => {
     renderAlerts();

@@ -144,6 +144,14 @@ export function symptomChecksOn(db: Db, barangayId: number, date: string): numbe
   return row?.checks ?? 0;
 }
 
+/** Symptom checks WITH warning signs already counted for this barangay on this day (for the warning-sign cap). */
+export function symptomWarningChecksOn(db: Db, barangayId: number, date: string): number {
+  const row = db
+    .prepare("SELECT checks_with_warning_signs AS n FROM symptom_count WHERE barangay_id = ? AND date = ?")
+    .get(barangayId, date) as { n: number } | undefined;
+  return row?.n ?? 0;
+}
+
 /** One answer per resident per day. Returns false if they already answered today. */
 export function insertDailyAnswer(
   db: Db,
