@@ -137,8 +137,8 @@ export function setPuroks(
   names: string[],
   at: string = now(),
 ): { added: string[]; removed: string[] } {
-  const key = (s: string) => s.trim().replace(/s+/g, " ").toLowerCase();
-  const wanted = new Map(names.map((n) => [key(n), n.trim().replace(/s+/g, " ")]));
+  const key = (s: string) => s.trim().replace(/\s+/g, " ").toLowerCase();
+  const wanted = new Map(names.map((n) => [key(n), n.trim().replace(/\s+/g, " ")]));
   const current = puroksOf(db, barangayId);
   const have = new Set(current.map((p) => key(p.name)));
 

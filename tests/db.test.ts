@@ -3,7 +3,7 @@ import { DEFAULT_PARAMETERS } from "../src/algorithms/parameters";
 import { runMigrations } from "../src/db/migrate";
 import { MIGRATIONS } from "../src/db/migrations";
 import {
-  addPurok, createBarangay, deleteBarangay, densityRatios, getBarangay, listBarangays, updateBarangay,
+  addPurok, createBarangay, deleteBarangay, densityRatios, getBarangay, listBarangays, setPuroks, updateBarangay,
 } from "../src/db/repositories/barangayRepo";
 import { barangayCases, purokCases, replaceWeekCases } from "../src/db/repositories/caseRepo";
 import {
@@ -89,6 +89,31 @@ describe("barangays", () => {
     expect(listBarangays(db).map((x) => x.id)).toEqual([b]);
     expect(count(db, "weather_record")).toBe(1); // weather belongs to the municipality
     expect(deleteBarangay(db, a)).toBe(false);
+  });
+
+  describe("setPuroks", () => {
+    const names = (db: ReturnType<typeof twoBarangays>["db"], id: number) => getBarangay(db, id)!.puroks.map((p) => p.name);
+
+    it("adds a new purok with the name exactly as typed, including the letter s", () => {
+      const { db, a } = twoBarangays();
+      const result = setPuroks(db, a, ["Purok 1", "Purok 2", "Sitio Santos", "Sagpon Riverside"]);
+      expect(result).toEqual({ added: ["Sitio Santos", "Sagpon Riverside"], removed: [] });
+      expect(names(db, a)).toEqual(["Purok 1", "Purok 2", "Sitio Santos", "Sagpon Riverside"]);
+    });
+
+    it("matches existing names ignoring case and extra spaces, so nothing is added or removed", () => {
+      const { db, a } = twoBarangays();
+      const result = setPuroks(db, a, ["  purok   1 ", "PUROK 2"]);
+      expect(result).toEqual({ added: [], removed: [] });
+      expect(names(db, a)).toEqual(["Purok 1", "Purok 2"]); // the stored names are untouched
+    });
+
+    it("stores a new name with its inner spaces collapsed, and removes a purok that is no longer listed", () => {
+      const { db, a } = twoBarangays();
+      const result = setPuroks(db, a, ["Purok 1", "  Sitio    Mabini  "]);
+      expect(result).toEqual({ added: ["Sitio Mabini"], removed: ["Purok 2"] });
+      expect(names(db, a)).toEqual(["Purok 1", "Sitio Mabini"]);
+    });
   });
 });
 
