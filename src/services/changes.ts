@@ -24,6 +24,7 @@ import {
   insertHouseholdReport,
   symptomChecksOn,
   symptomWarningChecksOn,
+  lastReportDate,
 } from "../db/repositories/signalRepo";
 import {
   NewContainer,
@@ -36,7 +37,7 @@ import {
 } from "../db/repositories/workflowRepo";
 import { AppError, isUniqueViolation } from "../errors";
 import * as v from "../validate";
-import { formatDate } from "../util/dates";
+import { addDays, formatDate } from "../util/dates";
 import {
   CaseImportResult,
   importCases,
@@ -119,6 +120,14 @@ export function warningCheckCap(population: number): number {
   return Math.max(WARNING_CHECK_MINIMUM, Math.ceil(population * WARNING_CHECK_SHARE));
 }
 
+// A household report is something a resident goes and does (not a quick self-assessment), and conditions at home do
+// not change daily, so a resident can send at most ONE report in any 7 days. Enforced by the server per resident (the
+// hashed phone number), whichever barangay they chose. A refused report is not saved.
+//
+// PROVISIONAL, TO REVIEW (decided 2026-11-22, see the deviations log, "Household report limit"). With the household
+// signal looking at the last 7 days, this also means each resident counts at most once in the window.
+export const REPORT_INTERVAL_DAYS = 7;
+
 export class DataChanges {
   constructor(
     private readonly db: Db,
@@ -196,17 +205,34 @@ export class DataChanges {
     report: { standingWater: unknown; cloggedGutter: unknown; oldContainers: unknown; bitesIndoors: unknown },
   ): void {
     const resident = this.residentOrFail(residentId);
+    const standingWater = v.bool(report.standingWater, "standingWater");
+    const cloggedGutter = v.bool(report.cloggedGutter, "cloggedGutter");
+    const oldContainers = v.bool(report.oldContainers, "oldContainers");
+    const bitesIndoors = v.bool(report.bitesIndoors, "bitesIndoors");
+    // At most one report per resident in any 7 days. Refused, not saved; the page shows the date of the next one.
+    const next = this.nextReportDate(residentId);
+    if (next !== null) {
+      throw new AppError(429, `You already sent a household report this week. You can send the next one on ${next}.`, { nextReportDate: next });
+    }
     insertHouseholdReport(this.db, {
       residentId,
       barangayId: resident.barangayId,
       date: this.today(),
-      standingWater: v.bool(report.standingWater, "standingWater"),
-      cloggedGutter: v.bool(report.cloggedGutter, "cloggedGutter"),
-      oldContainers: v.bool(report.oldContainers, "oldContainers"),
-      bitesIndoors: v.bool(report.bitesIndoors, "bitesIndoors"),
+      standingWater,
+      cloggedGutter,
+      oldContainers,
+      bitesIndoors,
       at: this.ranking.now().toISOString(),
     });
     this.ranking.rescore([resident.barangayId], { reason: "household report" });
+  }
+
+  /** When this resident may send their next household report, or null if they may send one now. */
+  nextReportDate(residentId: number): string | null {
+    const last = lastReportDate(this.db, residentId);
+    if (last === undefined) return null;
+    const next = addDays(last, REPORT_INTERVAL_DAYS);
+    return next > this.today() ? next : null;
   }
 
   /** Anonymous: only the barangay's daily totals change. No resident is stored. */

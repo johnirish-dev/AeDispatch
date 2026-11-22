@@ -66,6 +66,12 @@ export function residentRoutes({ db, ranking, changes, sessions }: AppDeps): Rou
     res.json({ signedIn: true });
   });
 
+  // Whether the resident may send a household report now (one per resident in any 7 days), and if not, when.
+  router.get("/report/status", requireResident(sessions), (req, res) => {
+    const next = changes.nextReportDate(req.residentId!);
+    res.json({ canReport: next === null, nextReportDate: next });
+  });
+
   // The report goes to the barangay the resident chose when signing in.
   router.post("/household-report", requireResident(sessions), (req, res) => {
     const body = v.bodyObject(req.body);

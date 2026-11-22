@@ -152,6 +152,12 @@ export function symptomWarningChecksOn(db: Db, barangayId: number, date: string)
   return row?.n ?? 0;
 }
 
+/** The date of this resident's latest household report, if they ever sent one (for the one-report-a-week limit). */
+export function lastReportDate(db: Db, residentId: number): string | undefined {
+  const row = db.prepare("SELECT MAX(date) AS d FROM household_report WHERE resident_id = ?").get(residentId) as { d: string | null };
+  return row.d ?? undefined;
+}
+
 /** One answer per resident per day. Returns false if they already answered today. */
 export function insertDailyAnswer(
   db: Db,

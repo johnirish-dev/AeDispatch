@@ -181,6 +181,8 @@ export const strings = {
     "report.note": "Stored only as barangay totals. No photos or addresses.",
     "report.done": "Anonymous barangay report submitted",
     "report.signInAgain": "Please sign in again to send your report.",
+    "report.waitTitle": "You already sent a report this week",
+    "report.waitBody": "You can send your next one on {date}. Thank you for reporting.",
 
     "check.title": "How are you feeling?",
     "check.symptoms": "Symptoms",
@@ -454,6 +456,8 @@ export const strings = {
     "report.note": "Barangay totals lang ang iniimbak. Walang larawan o address.",
     "report.done": "Naisumite na ang anonymous na ulat para sa barangay",
     "report.signInAgain": "Mag-sign in muli para maipadala ang ulat.",
+    "report.waitTitle": "Nakapagpadala na kayo ng ulat ngayong linggo",
+    "report.waitBody": "Maaari kayong magpadala ng susunod sa {date}. Salamat sa pag-uulat.",
 
     "check.title": "Ano ang inyong nararamdaman?",
     "check.symptoms": "Mga sintomas",

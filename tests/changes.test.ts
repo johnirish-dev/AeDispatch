@@ -8,6 +8,7 @@ import { listBhws } from "../src/db/repositories/userRepo";
 import { AppError } from "../src/errors";
 import { DataChanges } from "../src/services/changes";
 import { RankingService } from "../src/services/ranking";
+import { addDays } from "../src/util/dates";
 import { count, dataFile, officerId, seededDb } from "./helpers";
 
 const ANCHOR = "2026-11-19";
@@ -133,14 +134,26 @@ describe("resident contributions", () => {
     expectError(() => changes.recordDailyAnswer(999999, "yes"), 401, /Sign in/);
   });
 
-  it("a household report with breeding sites raises the household index", () => {
+  it("a household report with breeding sites raises the household index (three different residents, one report each)", () => {
     const { db, changes } = setup();
-    const { residentId, barangayId } = newResident(db, "Mabini", 2);
-    const before = latestScoreFor(db, barangayId)!.c;
-    for (let i = 0; i < 3; i++) {
+    const first = newResident(db, "Mabini", 2);
+    const before = latestScoreFor(db, first.barangayId)!.c;
+    for (const n of [2, 3, 4]) {
+      const { residentId } = n === 2 ? first : newResident(db, "Mabini", n);
       changes.recordHouseholdReport(residentId, { standingWater: true, cloggedGutter: true, oldContainers: false, bitesIndoors: true });
     }
-    expect(latestScoreFor(db, barangayId)!.c).toBeGreaterThan(before);
+    expect(latestScoreFor(db, first.barangayId)!.c).toBeGreaterThan(before);
+  });
+
+  it("one resident can send one household report in any 7 days: the second is refused and saves nothing", () => {
+    const { db, changes } = setup();
+    const { residentId } = newResident(db, "Mabini", 5);
+    const report = { standingWater: true, cloggedGutter: false, oldContainers: false, bitesIndoors: false };
+    changes.recordHouseholdReport(residentId, report);
+    const saved = count(db, "household_report");
+    expect(changes.nextReportDate(residentId)).toBe(addDays(ANCHOR, 7));
+    expectError(() => changes.recordHouseholdReport(residentId, report), 429, /already sent a household report this week/);
+    expect(count(db, "household_report")).toBe(saved);
   });
 
   it("a symptom check adds to the daily total and stores no resident", () => {

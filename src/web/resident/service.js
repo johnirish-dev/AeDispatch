@@ -12,9 +12,11 @@ const BASE = "/api/resident";
 
 /** A request the server refused, or could not be understood. `status` is the HTTP status (0: no connection). */
 export class ServiceError extends Error {
-  constructor(status, message) {
+  constructor(status, message, body = null) {
     super(message);
     this.status = status;
+    /** What the server sent besides the message (for example nextReportDate), or null. */
+    this.body = body;
   }
 }
 
@@ -36,7 +38,7 @@ async function call(path, { method = "GET", body } = {}) {
   } catch {
     data = null;
   }
-  if (!response.ok) throw new ServiceError(response.status, data?.error ?? "Request failed");
+  if (!response.ok) throw new ServiceError(response.status, data?.error ?? "Request failed", data);
   return data;
 }
 
@@ -92,6 +94,11 @@ export const service = {
     } catch {
       return false;
     }
+  },
+
+  /** { canReport, nextReportDate }: a resident may send one household report in any 7 days. */
+  reportStatus() {
+    return call("/report/status");
   },
 
   /** The household report. The server files it under the barangay chosen at sign-in. */

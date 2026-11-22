@@ -440,6 +440,11 @@
         <p class="muted-text" style="margin-top: 4px;" data-i18n="report.sub">Tick everything you noticed. Leave blank if all clear.</p>
       </div>
 
+      <div class="notice-card" id="report-wait" role="status" hidden>
+        <h2 class="card-title" data-i18n="report.waitTitle">You already sent a report this week</h2>
+        <p class="muted-text" style="color: var(--res-text);" id="report-wait-body"></p>
+      </div>
+
       <form id="household-report-form" class="check-list">
         <label class="box-check"><input type="checkbox" name="standing_water"><span data-i18n="report.o1">Containers with standing water</span></label>
         <label class="box-check"><input type="checkbox" name="clogged_drain"><span data-i18n="report.o2">Clogged gutter or drain</span></label>

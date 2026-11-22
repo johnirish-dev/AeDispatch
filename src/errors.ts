@@ -5,6 +5,8 @@ export class AppError extends Error {
   constructor(
     public readonly status: number,
     message: string,
+    /** Extra fields sent next to `error`, for a page that needs more than the text (for example a date). */
+    public readonly details?: Record<string, unknown>,
   ) {
     super(message);
     this.name = "AppError";

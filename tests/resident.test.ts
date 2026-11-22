@@ -4,7 +4,7 @@ import { runMigrations } from "../src/db/migrate";
 import { MIGRATIONS } from "../src/db/migrations";
 import { addAnonymousAnswer, addSymptomCheck, answerTotals, symptomWarningChecksOn } from "../src/db/repositories/signalRepo";
 import { latestScoreFor } from "../src/db/repositories/scoreRepo";
-import { anonymousDailyCap, warningCheckCap } from "../src/services/changes";
+import { REPORT_INTERVAL_DAYS, anonymousDailyCap, warningCheckCap } from "../src/services/changes";
 import { RAIN_FAVORABLE_FROM, TEMP_FAVORABLE_FROM, weatherOf } from "../src/services/residentViews";
 import { PIN_MAX_TRIES, PIN_RESEND_SECONDS, PIN_TTL_SECONDS } from "../src/services/residentAuth";
 import { addDays } from "../src/util/dates";
@@ -124,6 +124,117 @@ describe("the warning-sign cap on the symptom check", () => {
       expect((await post({ warningSigns: true })).status).toBe(429);
       expect((await post({ warningSigns: false })).status).toBe(201);
       expect((await post({ warningSigns: "yes" })).status).toBe(400); // checked before any limit
+    } finally {
+      await api.close();
+    }
+  });
+});
+
+describe("the household report limit (one per resident in any 7 days)", () => {
+  const body = { standingWater: true, cloggedGutter: false, oldContainers: true, bitesIndoors: false };
+  const DAY = 24 * 60 * 60 * 1000;
+
+  async function signIn(api: Api, phone: string, barangay: string) {
+    const id = (api.db.prepare("SELECT id FROM barangay WHERE name = ?").get(barangay) as { id: number }).id;
+    const client = api.client();
+    const sent = await client.post("/api/resident/auth/send-pin", { phone });
+    await client.post("/api/resident/auth/verify", { phone, pin: sent.body.pin, barangayId: id });
+    return { client, id };
+  }
+
+  it("is 7 days", () => {
+    expect(REPORT_INTERVAL_DAYS).toBe(7);
+  });
+
+  it("accepts the first report and refuses a second the same day: 429, the date of the next one, nothing saved, no re-score", async () => {
+    const api = await startApi();
+    try {
+      const { client } = await signIn(api, "9171110001", "Busay");
+      expect((await client.post("/api/resident/household-report", body)).status).toBe(201);
+      const reports = count(api.db, "household_report");
+      const scoreRows = count(api.db, "threat_score");
+      const second = await client.post("/api/resident/household-report", { standingWater: false, cloggedGutter: false, oldContainers: false, bitesIndoors: false });
+      expect(second.status).toBe(429);
+      expect(second.body).toMatchObject({ nextReportDate: addDays(ANCHOR, 7) });
+      expect(second.body.error).toMatch(/already sent a household report this week/);
+      expect(count(api.db, "household_report")).toBe(reports);
+      expect(count(api.db, "threat_score")).toBe(scoreRows);
+    } finally {
+      await api.close();
+    }
+  });
+
+  it("still refuses on day 6 and accepts on day 7, and then the next week starts", async () => {
+    const api = await startApi();
+    try {
+      const first = await signIn(api, "9171110002", "Busay");
+      expect((await first.client.post("/api/resident/household-report", body)).status).toBe(201);
+
+      api.advance(6 * DAY); // sessions last 8 hours, so the resident signs in again
+      const day6 = await signIn(api, "9171110002", "Busay");
+      const refused = await day6.client.post("/api/resident/household-report", body);
+      expect(refused.status).toBe(429);
+      expect(refused.body.nextReportDate).toBe(addDays(ANCHOR, 7));
+
+      api.advance(DAY);
+      const day7 = await signIn(api, "9171110002", "Busay");
+      expect((await day7.client.post("/api/resident/household-report", body)).status).toBe(201);
+      const next = await day7.client.get("/api/resident/report/status");
+      expect(next.body).toEqual({ canReport: false, nextReportDate: addDays(ANCHOR, 14) });
+    } finally {
+      await api.close();
+    }
+  });
+
+  it("is per resident: another phone number can report the same day", async () => {
+    const api = await startApi();
+    try {
+      const a = await signIn(api, "9171110003", "Busay");
+      const b = await signIn(api, "9171110004", "Busay");
+      expect((await a.client.post("/api/resident/household-report", body)).status).toBe(201);
+      expect((await b.client.post("/api/resident/household-report", body)).status).toBe(201);
+      expect((await a.client.post("/api/resident/household-report", body)).status).toBe(429);
+    } finally {
+      await api.close();
+    }
+  });
+
+  it("follows the resident, not the barangay: signing in again for another barangay does not give a new report", async () => {
+    const api = await startApi();
+    try {
+      const first = await signIn(api, "9171110005", "Busay");
+      expect((await first.client.post("/api/resident/household-report", body)).status).toBe(201);
+      api.advance(60 * 1000); // past the resend wait
+      const saved = count(api.db, "household_report");
+      const again = await signIn(api, "9171110005", "Mabini");
+      const res = await again.client.post("/api/resident/household-report", body);
+      expect(res.status).toBe(429);
+      expect(count(api.db, "household_report")).toBe(saved);
+    } finally {
+      await api.close();
+    }
+  });
+
+  it("an invalid report is a 400 before the limit and does not use up the week", async () => {
+    const api = await startApi();
+    try {
+      const { client } = await signIn(api, "9171110006", "Busay");
+      expect((await client.post("/api/resident/household-report", { ...body, standingWater: "yes" })).status).toBe(400);
+      expect((await client.post("/api/resident/household-report", body)).status).toBe(201);
+      expect((await client.post("/api/resident/household-report", { ...body, standingWater: "yes" })).status).toBe(400); // still a 400, not a 429
+    } finally {
+      await api.close();
+    }
+  });
+
+  it("the status route tells the page whether it may send: yes at first, then no with the date; it needs a sign-in", async () => {
+    const api = await startApi();
+    try {
+      expect((await api.client().get("/api/resident/report/status")).status).toBe(401);
+      const { client } = await signIn(api, "9171110007", "Busay");
+      expect((await client.get("/api/resident/report/status")).body).toEqual({ canReport: true, nextReportDate: null });
+      await client.post("/api/resident/household-report", body);
+      expect((await client.get("/api/resident/report/status")).body).toEqual({ canReport: false, nextReportDate: addDays(ANCHOR, 7) });
     } finally {
       await api.close();
     }

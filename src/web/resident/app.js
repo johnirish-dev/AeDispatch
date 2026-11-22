@@ -102,6 +102,7 @@ function applyLanguage() {
   renderWarning(state.weather ?? null, state.level ?? null);
   renderAlerts();
   renderSymptomResult();
+  renderReportWait();
 }
 
 function setLanguage(lang) {
@@ -589,11 +590,51 @@ function setAlerts(on) {
 // ---- sign-in (only to send a report) -------------------------------------------------------
 
 function openReport() {
-  if (state.signedIn) showScreen("screen-report");
-  else {
+  if (state.signedIn) {
+    showScreen("screen-report");
+    refreshReportStatus();
+  } else {
     $("phone-error").hidden = true;
     showScreen("screen-signin");
   }
+}
+
+// A resident can send one household report in any 7 days (the server decides). The screen says so before the
+// resident fills anything in, and shows the date of the next one; the form is switched off until then.
+async function refreshReportStatus() {
+  try {
+    const status = await service.reportStatus();
+    setReportNext(status.nextReportDate);
+  } catch (failure) {
+    if (failure instanceof ServiceError && failure.status === 401) reportSignInEnded();
+    else setReportNext(null); // unknown (no connection): show the form, the server still enforces the limit
+  }
+}
+
+function setReportNext(date) {
+  state.reportNext = typeof date === "string" ? date : null;
+  renderReportWait();
+}
+
+function renderReportWait() {
+  const waiting = typeof state.reportNext === "string";
+  $("report-wait").hidden = !waiting;
+  if (waiting) {
+    const day = new Intl.DateTimeFormat(t("locale"), { weekday: "short", month: "short", day: "numeric" }).format(new Date(`${state.reportNext}T12:00:00`));
+    $("report-wait-body").textContent = t("report.waitBody", { date: day });
+  }
+  $$("#household-report-form input, #household-report-form button[type=submit]").forEach((el) => {
+    el.disabled = waiting;
+  });
+}
+
+function reportSignInEnded() {
+  // The sign-in ended (a session lasts 8 hours and is lost when the server restarts).
+  state.signedIn = false;
+  store.set("signedIn", false);
+  showToast(t("report.signInAgain"));
+  $("phone-error").hidden = true;
+  showScreen("screen-signin");
 }
 
 const formatPhone = (digits) => `+63 ${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`;
@@ -784,12 +825,10 @@ async function submitReport(event) {
     await service.submitReport(flags);
   } catch (failure) {
     if (failure instanceof ServiceError && failure.status === 401) {
-      // The sign-in ended (a session lasts 8 hours and is lost when the server restarts).
-      state.signedIn = false;
-      store.set("signedIn", false);
-      showToast(t("report.signInAgain"));
-      $("phone-error").hidden = true;
-      showScreen("screen-signin");
+      reportSignInEnded();
+    } else if (failure instanceof ServiceError && failure.status === 429 && failure.body?.nextReportDate) {
+      setReportNext(failure.body.nextReportDate); // already sent this week: show when the next one is possible
+      showToast(t("report.waitTitle"));
     } else {
       showToast(t("toast.notSent"));
     }

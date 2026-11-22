@@ -10,7 +10,7 @@ export const notFound: RequestHandler = (_req, res) => {
 
 export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   if (err instanceof AppError) {
-    res.status(err.status).json({ error: err.message });
+    res.status(err.status).json({ ...err.details, error: err.message });
     return;
   }
   // express.json() problems: broken JSON or a body that is too large
