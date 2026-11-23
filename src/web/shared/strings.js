@@ -11,7 +11,6 @@ export const strings = {
     loading: "Loading…",
     retry: "Try again",
     signOut: "Sign out",
-    sampleData: "Sample data for demonstration. No real residents or patients.",
     noJs: "This page needs JavaScript to run.",
     serverError: "Something went wrong. Please try again.",
     asOf: "as of",
@@ -27,18 +26,18 @@ export const strings = {
     generalTitle: "General",
     nav: [
       { key: "overview", label: "Dashboard", href: "/officer/", group: "menu" },
-      { key: "queue", label: "Priority queue", href: "/officer/queue.html", group: "menu" },
-      { key: "import", label: "Case data import", href: "/officer/import.html", group: "menu" },
-      { key: "profiles", label: "Barangay profiles", href: "/officer/profiles.html", group: "menu" },
+      { key: "queue", label: "Priority Queue", href: "/officer/queue.html", group: "menu" },
+      { key: "import", label: "Case Data Import", href: "/officer/import.html", group: "menu" },
+      { key: "profiles", label: "Barangay Profiles", href: "/officer/profiles.html", group: "menu" },
       { key: "trends", label: "Trends", href: "/officer/trends.html", group: "menu" },
-      { key: "activity", label: "Activity & dispatches", href: "/officer/activity.html", group: "menu" },
-      { key: "demo", label: "Demo tools", href: "/officer/demo.html", group: "general" },
+      { key: "activity", label: "Activity & Dispatches", href: "/officer/activity.html", group: "menu" },
+      { key: "demo", label: "Demo Tools", href: "/officer/demo.html", group: "general" },
     ],
 
     login: {
-      title: "Sign in",
+      title: "Welcome back",
       tagline: "Early-warning dispatch for municipal dengue vector control",
-      welcome: "Sign in to the Daraga health office dashboard.",
+      welcome: "Sign in to the Daraga Municipal Health Office dashboard.",
       points: [
         "Ranks every barangay by dengue threat score.",
         "Nothing is dispatched until an officer confirms it.",
@@ -49,8 +48,8 @@ export const strings = {
       submit: "Sign in",
       busy: "Signing in…",
       wrong: "Wrong username or password.",
-      // remove for a real pilot
-      demoHint: "Demo account: officer / demo1234",
+      showPassword: "Show",
+      hidePassword: "Hide",
     },
 
     overview: {
@@ -90,7 +89,7 @@ export const strings = {
     },
 
     queue: {
-      title: "Priority queue",
+      title: "Priority Queue",
       sub: "All barangays, ranked by threat score (out of 100)",
       columns: { barangay: "Barangay", score: "Threat score", risk: "Risk level", action: "Action" },
       scoreOfSpoken: "out of 100",
@@ -119,9 +118,8 @@ export const strings = {
     },
 
     demo: {
-      title: "Demo tools",
+      title: "Demo Tools",
       teamOnly: "Team only",
-      sub: "For the team: open the phone screens, change the weather, try other weights and show the evaluation results.",
       tabsLabel: "Demo tools sections",
       loadError: "This could not be loaded.",
       retry: "Try again",
@@ -339,21 +337,36 @@ export const strings = {
 
     trends: {
       title: "Trends",
-      sub: "Past 8 weeks · all barangays",
-      weekNote: (w) => `Latest case week: ${w}`,
-      casesTitle: "Confirmed cases",
-      casesSub: "Confirmed dengue cases reported each week",
-      casesChartTitle: "Confirmed cases per week, all barangays",
-      casesChartDesc: "Bar chart of confirmed dengue cases for each of the last eight weeks.",
-      riskTitle: "Barangays by risk level",
-      riskSub: "How many barangays were at each risk level each week",
-      riskChartTitle: "Number of barangays at each risk level per week",
-      riskChartDesc: "Stacked bar chart: how many barangays were Low, Moderate, Elevated or High in each of the last eight weeks.",
       loadError: "The trends could not be loaded.",
+      casesTitle: "Confirmed cases",
+      casesSeries: "Confirmed cases",
+      casesChartTitle: "Confirmed cases per week, all barangays",
+      casesChartDesc: "Line chart of confirmed dengue cases for each of the last eight weeks.",
+      casesCaption: (latest, before, week) =>
+        latest === before ? `${latest} confirmed cases in ${week}, the same as the week before.` : `${latest} confirmed cases in ${week}, ${latest > before ? "up" : "down"} from ${before} the week before.`,
+      riskTitle: "Barangays by risk level",
+      riskChartTitle: "Number of barangays at each risk level per week",
+      riskChartDesc: "Four small line charts on the same scale: how many barangays were High, Elevated, Moderate or Low in each of the last eight weeks.",
+      riskCaption: (now, before) =>
+        now === before
+          ? `${now} barangays are Elevated or High, the same as the week before.`
+          : `${now} barangays are Elevated or High, ${now > before ? "up" : "down"} from ${before} the week before.`,
+      signalsTitle: "Signals behind the score",
+      signalsSub: "One chart for each data source, all barangays together, each on its own scale.",
+      partialNote: "The dashed part is the week that is not over yet.",
+      signalsChartTitle: "Weekly figures for each data source",
+      signalsChartDesc: "Small line charts of rain, temperature, household reports, symptom checks with warning signs, and the share of inspected containers with larvae, for each of the last eight weeks.",
+      signals: {
+        rain: { name: "Rain", unit: "mm" },
+        temp: { name: "Temperature", unit: "°C" },
+        reports: { name: "Household reports", unit: "" },
+        symptoms: { name: "Warning-sign checks", unit: "" },
+        containers: { name: "Containers with larvae", unit: "%" },
+      },
     },
 
     activity: {
-      title: "Activity & dispatches",
+      title: "Activity & Dispatches",
       sub: "What was assigned, what came back, and what happened when.",
       assignmentsTitle: "Field assignments",
       assignmentsEmpty: "No field assignments yet. They appear here when an officer confirms a recommendation.",
@@ -474,7 +487,7 @@ export const strings = {
       eventsError: "The event timeline could not be loaded.",
     },
     profiles: {
-      title: "Barangay profiles",
+      title: "Barangay Profiles",
       sub: "The barangays in the pilot area. Population and area set the density used in every score.",
       add: "Add barangay",
       search: "Search a barangay",
@@ -491,8 +504,6 @@ export const strings = {
       clearSearch: "Clear search",
       loadError: "The barangays could not be loaded.",
       panelLabel: "Barangay details",
-      emptyTitle: "Select a barangay",
-      emptyBody: "Choose Edit on a row to change it, or Add barangay to create a new one.",
       editTitle: "Edit barangay",
       addTitle: "Add barangay",
       fields: { name: "Name", population: "Population", area: "Area (km²)", puroks: "Puroks" },
@@ -524,7 +535,7 @@ export const strings = {
       },
     },
     import: {
-      title: "Case data import",
+      title: "Case Data Import",
       sub: "Weekly confirmed dengue cases from the health office",
       dropTitle: "Choose a weekly CSV file",
       dropNote: "UTF-8 · up to 1 MB · one reporting week per file",

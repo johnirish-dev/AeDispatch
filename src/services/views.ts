@@ -13,6 +13,7 @@ import { getBarangay, listBarangays } from "../db/repositories/barangayRepo";
 import { latestCaseWeek, purokCases, weekCaseTotal } from "../db/repositories/caseRepo";
 import { getActiveParameters } from "../db/repositories/parameterRepo";
 import { ScoreRow, latestScores, scoreAtOrBefore } from "../db/repositories/scoreRepo";
+import { getWeatherSeries, municipalityTotals } from "../db/repositories/signalRepo";
 import { Bhw, listBhws } from "../db/repositories/userRepo";
 import { countActiveTasks, listRecommendations, listTasks } from "../db/repositories/workflowRepo";
 import { AppError } from "../errors";
@@ -262,17 +263,34 @@ export function buildDecisionView(db: Db, ranking: RankingService, barangayId: n
 
 export const TREND_WEEKS = 8;
 
+/** One number per week for each of the four signals besides cases. null means nothing was recorded that week. */
+export interface TrendSignals {
+  rainMm: (number | null)[];
+  meanTempC: (number | null)[];
+  householdReports: number[];
+  symptomWarnings: number[];
+  containersPositivePct: (number | null)[];
+}
+
 export interface TrendsView {
   weeks: string[];
   casesPerWeek: number[];
   riskPerWeek: Record<RiskLevel, number>[];
+  signals: TrendSignals;
+  /** True while the newest week has not ended yet, so its figures are still growing. */
+  latestWeekPartial: boolean;
 }
+
+const round1 = (n: number) => Math.round(n * 10) / 10;
 
 /**
  * Eight weeks ending at the newest case week that has started. For each week:
  * the confirmed cases of all barangays, and how many barangays sat at each risk
  * level, read from each barangay's newest score at the end of that week (never
  * later than now). A barangay with no score yet that week is not counted.
+ * `signals` adds, for the same weeks, the municipality-wide figures behind the other
+ * four sources: rain and temperature, household reports, symptom checks with warning
+ * signs, and the share of inspected containers that were positive.
  */
 export function buildTrendsView(db: Db, ranking: RankingService): TrendsView {
   const params = getActiveParameters(db);
@@ -294,6 +312,20 @@ export function buildTrendsView(db: Db, ranking: RankingService): TrendsView {
     return counts;
   });
 
-  return { weeks, casesPerWeek: weeks.map((w) => weekCaseTotal(db, w)), riskPerWeek };
+  const signals: TrendSignals = { rainMm: [], meanTempC: [], householdReports: [], symptomWarnings: [], containersPositivePct: [] };
+  for (const week of weeks) {
+    const from = isoWeekStart(parseIsoWeek(week)!);
+    const to = addDays(from, 6);
+    const days = getWeatherSeries(db, DEFAULT_MUNICIPALITY, from, to);
+    signals.rainMm.push(days.length ? round1(days.reduce((sum, d) => sum + d.rainfallMm, 0)) : null);
+    signals.meanTempC.push(days.length ? round1(days.reduce((sum, d) => sum + d.meanTempC, 0) / days.length) : null);
+    const totals = municipalityTotals(db, from, to);
+    signals.householdReports.push(totals.reports);
+    signals.symptomWarnings.push(totals.warningChecks);
+    signals.containersPositivePct.push(totals.containers > 0 ? round1((totals.positive / totals.containers) * 100) : null);
+  }
+
+  const newestSunday = addDays(isoWeekStart(parseIsoWeek(newest)!), 6);
+  return { weeks, casesPerWeek: weeks.map((w) => weekCaseTotal(db, w)), riskPerWeek, signals, latestWeekPartial: newestSunday > today };
 }
 

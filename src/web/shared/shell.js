@@ -109,8 +109,6 @@ export async function mountShell({ active }) {
     foot,
   );
 
-  document.querySelector(".content").append(h("footer", { class: "page-foot" }, strings.common.sampleData));
-
   // 401 here redirects to the login page (see api.js).
   const me = await get("/api/auth/me");
   avatar.textContent = initials(me.user.displayName);

@@ -215,8 +215,9 @@ function openPanel(title, values, id) {
   setPurokError(null);
   showErrors({});
   els.formError.hidden = true;
-  els.empty.hidden = true;
   els.form.hidden = false;
+  els.panel.hidden = false;
+  els.layout.classList.add("profiles--open");
   els.panel.classList.add("is-open");
   renderChips();
   if (state.list) renderRows();
@@ -237,7 +238,8 @@ function startAdd() {
 function closePanel() {
   state.editing = null;
   els.form.hidden = true;
-  els.empty.hidden = false;
+  els.panel.hidden = true;
+  els.layout.classList.remove("profiles--open");
   els.panel.classList.remove("is-open");
   if (state.list) renderRows();
 }
@@ -402,8 +404,8 @@ function buildPanel() {
       h("div", { class: "import__actions" }, els.saveBtn, h("button", { class: "btn", type: "button", onclick: closePanel }, t.cancel)),
     ),
   );
-  els.empty = h("div", {}, h("h2", {}, t.emptyTitle), h("p", { class: "muted", style: "margin-top: var(--s-2)" }, t.emptyBody));
-  els.panel = h("aside", { class: "card profile-panel", "aria-label": t.panelLabel }, els.empty, els.form);
+  // The panel is only on the page while a barangay is being added or edited; otherwise the list has the full width.
+  els.panel = h("aside", { class: "card profile-panel", "aria-label": t.panelLabel, hidden: true }, els.form);
   return els.panel;
 }
 
@@ -433,7 +435,7 @@ document.getElementById("main").append(
     h("button", { class: "btn btn--primary", type: "button", onclick: startAdd }, icon("plus"), t.add),
   ),
   els.banners,
-  h("div", { class: "profiles" }, buildList(), buildPanel()),
+  (els.layout = h("div", { class: "profiles" }, buildList(), buildPanel())),
   buildConfirm(),
 );
 await mountShell({ active: "profiles" });

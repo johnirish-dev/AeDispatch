@@ -700,7 +700,10 @@ function render(first = false) {
   clear(els.view);
   els.findingsLink.setAttribute("aria-current", r.name === "findings" || r.name === "barangay" || r.name === "finding" ? "page" : "false");
   els.logsLink.setAttribute("aria-current", r.name === "logs" ? "page" : "false");
-  if (!first) window.scrollTo(0, 0);
+  if (!first) {
+    window.scrollTo(0, 0);
+    document.getElementById("main")?.scrollTo(0, 0); // on a wide screen the card scrolls, not the page
+  }
   switch (r.name) {
     case "findings":
       renderFindings(token);

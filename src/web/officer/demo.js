@@ -500,7 +500,7 @@ panels.forEach(([key, panel], i) => {
 });
 
 document.getElementById("main").append(
-  h("header", { class: "page-head" }, h("div", {}, h("h1", { class: "page-title" }, t.title, " ", h("span", { class: "badge badge--dashed" }, t.teamOnly)), h("p", { class: "page-head__sub" }, t.sub))),
+  h("header", { class: "page-head" }, h("div", {}, h("h1", { class: "page-title" }, t.title, " ", h("span", { class: "badge badge--dashed" }, t.teamOnly)))),
   tabBar,
   ...panels.map(([, panel]) => panel),
 );

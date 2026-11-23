@@ -3,13 +3,19 @@
 /* ---------- login: the dark green card and the form, in the same floating frame ---------- */
 .login { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: var(--s-4); min-height: 100vh; padding: var(--s-4); }
 .login__brand {
+  position: relative;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   gap: var(--s-6);
-  padding: var(--s-6);
+  padding: 44px 48px;
   border-radius: var(--r-xl);
-  background: linear-gradient(160deg, #1f7a50 0%, #135a38 55%, #113615 100%);
+  /* a picture of fine contour lines, darkened toward the bottom so the white text stays easy to read */
+  background:
+    linear-gradient(200deg, rgba(17, 54, 21, 0.1) 0%, rgba(17, 54, 21, 0.5) 52%, rgba(17, 54, 21, 0.9) 100%),
+    url("./login-art.jpg") center / cover no-repeat,
+    #135a38;
   color: #fff;
 }
 .login__brand .brand { color: #fff; }
@@ -17,39 +23,93 @@
 .brand__tile--disc { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%; background: #fff; }
 .brand__tile--disc img { width: 38px; height: auto; }
 .login__brand .brand__ae { color: #a7e3bf; }
-.login__intro { max-width: 28rem; }
-.login__slogan { font-size: var(--fs-3xl); font-weight: 500; line-height: 1.1; letter-spacing: -0.03em; text-wrap: balance; }
-.login__intro .login__tagline { margin-top: var(--s-3); color: var(--on-dark-muted); }
-.login__points { display: grid; gap: var(--s-3); margin-top: var(--s-5); }
-.login__points li { display: flex; align-items: flex-start; gap: var(--s-3); color: var(--on-dark); }
-.login__points .icon { margin-top: 2px; color: #a7e3bf; }
-.login__main { display: grid; place-items: center; padding: var(--s-5) var(--s-4); border-radius: var(--r-xl); background: var(--panel); }
-.login__card { width: 100%; max-width: 360px; }
-.login__card h1 { font-size: var(--fs-2xl); }
-.login__card form { margin-top: var(--s-5); display: grid; gap: var(--s-4); }
-.login__hint { margin-top: var(--s-4); color: var(--muted); font-size: var(--fs-xs); }
+/* The words sit at the bottom left of the panel, all on one left edge: the slogan, one line that says what it is,
+   then a hairline and the three points as a tidy list. */
+.login__intro { max-width: 30rem; }
+.login__slogan { max-width: 11ch; font-size: 54px; font-weight: 600; line-height: 1.04; letter-spacing: -0.04em; text-wrap: balance; }
+.login__intro .login__tagline { max-width: 26rem; margin-top: var(--s-4); color: var(--on-dark-muted); font-size: 17px; line-height: 1.5; text-wrap: balance; }
+.login__points { display: grid; gap: var(--s-3); margin-top: var(--s-5); padding-top: var(--s-5); border-top: 1px solid rgba(255, 255, 255, 0.2); }
+.login__points li { display: flex; align-items: center; gap: var(--s-3); color: var(--on-dark); font-size: var(--fs-md); line-height: 1.4; }
+.login__points .icon { box-sizing: content-box; flex: none; width: 14px; height: 14px; padding: 5px; border-radius: 50%; background: rgba(167, 227, 191, 0.18); color: #a7e3bf; }
+.login__main { position: relative; display: grid; place-items: center; padding: var(--s-5) var(--s-4); border-radius: var(--r-xl); background: var(--panel); }
+.login__card { width: 100%; max-width: 380px; }
+.login__card h1 { color: var(--brand-dark); font-size: 40px; font-weight: 600; letter-spacing: -0.035em; line-height: 1.05; }
+.login__welcome { margin-top: var(--s-2); color: var(--muted); font-size: var(--fs-md); }
+.login__card form { margin-top: var(--s-6); display: grid; gap: var(--s-5); }
+.login__card .input { min-height: 54px; padding-inline: var(--s-4); background: var(--surface); }
+.login__card .input:focus { border-color: var(--brand); outline: 0; box-shadow: 0 0 0 4px rgba(31, 122, 80, 0.16); }
+.login__card .btn--block { min-height: 52px; margin-top: var(--s-2); font-size: var(--fs-lg); }
+.field__control { position: relative; display: flex; }
+.field__control .input { width: 100%; }
+.input--toggle { padding-right: 72px; }
+.reveal { position: absolute; top: 50%; right: var(--s-2); transform: translateY(-50%); padding: var(--s-2) var(--s-3); border: 0; border-radius: var(--r-pill); background: transparent; color: var(--brand-dark); font-size: var(--fs-sm); font-weight: 600; cursor: pointer; }
+.reveal:hover { background: var(--accent-tint); }
+.login__card .btn--block { transition: transform 0.12s var(--ease-out), background-color 0.15s var(--ease-out); }
+.login__card .btn--block:active { transform: scale(0.985); }
+
+/* one entrance when the page opens: the words rise into place one after another, then the form */
+@keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+.login__brand .brand { animation: rise 0.6s var(--ease-out) both; }
+.login__slogan { animation: rise 0.7s 0.1s var(--ease-out) both; }
+.login__intro .login__tagline { animation: rise 0.7s 0.2s var(--ease-out) both; }
+.login__points li { animation: rise 0.6s var(--ease-out) both; }
+.login__points li:nth-child(1) { animation-delay: 0.32s; }
+.login__points li:nth-child(2) { animation-delay: 0.4s; }
+.login__points li:nth-child(3) { animation-delay: 0.48s; }
+.login__card h1 { animation: rise 0.6s 0.15s var(--ease-out) both; }
+.login__welcome { animation: rise 0.6s 0.22s var(--ease-out) both; }
+.login__card form > * { animation: rise 0.6s var(--ease-out) both; }
+.login__card form > :nth-child(1) { animation-delay: 0.3s; }
+.login__card form > :nth-child(2) { animation-delay: 0.38s; }
+.login__card form > :nth-child(3) { animation-delay: 0.46s; }
+.login__card form > :nth-child(4) { animation-delay: 0.52s; }
+/* a wrong password shakes the form once */
+@keyframes shake { 0%, 100% { transform: none; } 20% { transform: translateX(-8px); } 40% { transform: translateX(7px); } 60% { transform: translateX(-5px); } 80% { transform: translateX(3px); } }
+.login__card form.shake { animation: shake 0.4s var(--ease-out); }
 
 @media (max-width: 899px) {
   .login { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; padding: var(--s-3); gap: var(--s-3); }
   .login__brand { padding: var(--s-4); }
   .login__intro { display: none; }
+  .login__brand { min-height: 0; }
 }
 
 /* ---------- page header ---------- */
 .page-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s-4); margin-bottom: var(--s-5); }
 .page-title { color: var(--brand-dark); font-size: 44px; font-weight: 600; letter-spacing: -0.035em; line-height: 1.05; }
 .page-head__sub { margin-top: var(--s-2); color: var(--muted); font-size: var(--fs-md); }
+/* On a wide screen the title of the page stays at the top of the card while the page scrolls under it. */
+@media screen and (min-width: 1100px) {
+  .page-head {
+    position: sticky;
+    top: calc(-1 * var(--s-5)); /* the card's padding is part of the scrolling area, so this is the card's top edge */
+    z-index: 6;
+    margin: calc(-1 * var(--s-5)) calc(-1 * var(--s-5)) var(--s-4);
+    padding: var(--s-4) var(--s-5) var(--s-3);
+    border-radius: var(--r-xl) var(--r-xl) 0 0;
+    background: var(--panel);
+  }
+  /* what scrolls under the title fades out instead of being cut off */
+  .page-head::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 14px; background: linear-gradient(var(--panel), rgba(247, 247, 247, 0)); pointer-events: none; }
+}
 
 /* today's temperature, beside the title */
 .page-head__left { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-4) var(--s-5); }
-.temp { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: var(--s-1) var(--s-3); padding: 10px var(--s-5); border: 1px solid var(--line); border-radius: var(--r-pill); background: var(--surface); box-shadow: var(--shadow); }
+.temp { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: var(--s-1) var(--s-3); padding: 6px var(--s-4); border: 1px solid var(--line); border-radius: var(--r-pill); background: var(--surface); box-shadow: var(--shadow); }
 .temp__main { font-size: var(--fs-xl); font-weight: 600; letter-spacing: -0.02em; }
 .temp__sub { color: var(--muted); font-size: var(--fs-sm); }
 
 /* the date and time, ticking from the server's clock */
-.clock { display: grid; gap: 2px; padding: var(--s-3) var(--s-5); border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--shadow); }
-.clock__date { font-size: var(--fs-lg); font-weight: 500; letter-spacing: -0.01em; }
-.clock__time { color: var(--muted); font-size: var(--fs-md); font-variant-numeric: tabular-nums; }
+.clock { display: grid; gap: 0; padding: 6px var(--s-4); border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--shadow); }
+.clock__date { font-size: var(--fs-md); font-weight: 500; letter-spacing: -0.01em; }
+.clock__time { color: var(--muted); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+
+/* ---------- the entrance on the dashboard and the priority queue: once, short, and only on the first draw ---------- */
+@keyframes rise-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes bar-grow { from { width: 0; } }
+.is-entering .score__fill { animation: bar-grow 0.8s 0.2s var(--ease-out) both; }
+.focus__list.is-entering > .focus__item, .list.is-entering > .list__item { animation: rise-in 0.45s var(--ease-out) both; animation-delay: calc(var(--n, 0) * 80ms); }
+.is-entering > tr.row-enter { animation: rise-in 0.4s var(--ease-out) both; animation-delay: calc(var(--n, 0) * 50ms); }
 
 /* ---------- trends ---------- */
 .chart-skeleton { height: 180px; margin-top: var(--s-4); }
@@ -115,22 +175,50 @@
 .focus__emptytitle { font-size: var(--fs-lg); font-weight: 500; }
 .card__head .btn .icon { width: 14px; height: 14px; margin-left: var(--s-1); }
 
-/* The dashboard is built to fit one screen with no scrolling: on a tall screen the rows and
-   the headline cards grow with the window height; on a short one they stay compact. */
-@media (min-width: 1100px) {
-  .main--fit .stat { min-height: clamp(130px, 15vh, 190px); }
-  .focus__item { padding: clamp(var(--s-4), 3vh, 40px) 0; }
-  .focus__item:first-child { padding-top: 0; }
-  .main--fit .page-head { margin-bottom: clamp(0px, 1vh, 12px); }
+/* The dashboard fits the card at any normal window height, with nothing to scroll: the headline cards and the
+   rows share what is left. On a very small window the card still scrolls, as a safety. */
+@media screen and (min-width: 1100px) {
+  .main--fit { display: flex; flex-direction: column; gap: var(--s-4); }
+  .main--fit > * { margin-top: 0; }
+  .main--fit .page-head, .main--fit .stats { flex: none; margin-bottom: 0; }
+  .main--fit .page-head { margin-bottom: var(--s-1); }
+  .main--fit .stat { min-height: clamp(104px, 14vh, 150px); padding-top: var(--s-3); padding-bottom: var(--s-3); }
+  .main--fit .stat__value { font-size: clamp(34px, 5vh, 46px); }
+  .main--fit .dash { flex: 1 0 auto; align-items: stretch; } /* grows to fill the card; never shrinks below its content, so a very small window scrolls instead of overlapping */
+  .main--fit .focus { display: flex; flex-direction: column; }
+  .main--fit .focus__body { flex: 1; display: flex; flex-direction: column; margin-top: var(--s-3); }
+  .main--fit .focus__list { flex: 1; grid-auto-rows: 1fr; }
+  .main--fit .focus__item { padding: var(--s-2) 0; align-items: center; }
+  .main--fit .focus__item:first-child { padding-top: 0; }
+  .main--fit .focus__more { padding-top: var(--s-3); }
+  .main--fit .list__item { padding: var(--s-2) 0; }
 }
-/* A short laptop screen: pull the page footer up so the whole dashboard still fits. */
-@media (min-width: 1100px) and (max-height: 820px) {
-  .main--fit .page-head { margin-bottom: 0; }
-  .main--fit .stat { min-height: 112px; padding-top: var(--s-3); padding-bottom: var(--s-3); }
-  .main--fit .stat__value { font-size: 36px; }
-  .content:has(.main--fit) { gap: var(--s-2); }
-  .content:has(.main--fit) .page-foot { margin-top: 0; }
-  .app:has(.main--fit) { padding-bottom: var(--s-2); }
+/* A narrower laptop screen: the weather and the date shrink a little, so the dashboard header stays on one row. */
+@media screen and (min-width: 1100px) and (max-width: 1440px) {
+  .main--fit .page-head__left { gap: var(--s-2) var(--s-4); }
+  .main--fit .temp { padding: 4px var(--s-3); }
+  .main--fit .temp__main { font-size: var(--fs-lg); }
+  .main--fit .temp__sub { font-size: var(--fs-xs); }
+  .main--fit .clock { padding: 4px var(--s-3); }
+}
+/* A laptop window (the browser's own bars take a good part of the screen): tighter spacing, so the dashboard still fits. */
+@media screen and (min-width: 1100px) and (max-height: 780px) {
+  .main--fit { gap: var(--s-3); }
+  .main--fit .stat { min-height: 92px; padding: 10px var(--s-4); }
+  .main--fit .stat__value { font-size: 34px; }
+  .main--fit .stat .round { width: 28px; height: 28px; }
+  .main--fit .dash > .card, .main--fit .side > .card { padding: var(--s-4); }
+  .main--fit .focus__body { margin-top: var(--s-2); }
+  .main--fit .focus__item { padding: 4px 0; }
+  .main--fit .focus__more { padding-top: var(--s-2); }
+  .main--fit .list__item { padding: 6px 0; }
+}
+@media screen and (min-width: 1100px) and (max-height: 680px) {
+  .main--fit .stat { min-height: 0; padding: 8px var(--s-4); gap: var(--s-1); }
+  .main--fit .stat__value { margin-top: 0; font-size: 30px; }
+  .main--fit .stat__note { display: none; }
+  .main--fit { gap: var(--s-2); }
+  .main--fit .page-head { padding-top: var(--s-2); padding-bottom: var(--s-1); }
 }
 @media (max-width: 899px) {
   .focus__item { grid-template-columns: 40px minmax(0, 1fr) auto; row-gap: var(--s-3); }
@@ -151,7 +239,7 @@
 @media (min-width: 1100px) {
   .decision-head {
     position: sticky;
-    top: 0;
+    top: calc(-1 * var(--s-5)); /* the card's padding is part of the scrolling area, so this is the top edge of the card */
     z-index: 6;
     margin: calc(-1 * var(--s-5)) calc(-1 * var(--s-5)) var(--s-4);
     padding: var(--s-4) var(--s-5);
@@ -269,12 +357,21 @@
 }
 
 /* ---------- barangay profiles ---------- */
-.profiles { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: var(--s-4); align-items: start; }
-.profile-panel { position: sticky; top: var(--s-4); }
-.profile-panel:not(.is-open) { background: transparent; border-style: dashed; box-shadow: none; }
+.profiles { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); align-items: start; }
+/* While a barangay is being added or edited, the list moves to the left and the form sits beside it. */
+.profiles--open { grid-template-columns: minmax(0, 1fr) 380px; }
+.profile-panel { position: sticky; top: 0; }
+/* Too narrow for the list and the form side by side: the form goes under the list. */
+@media (max-width: 1279px) {
+  .profiles--open { grid-template-columns: minmax(0, 1fr); }
+  .profile-panel { position: static; }
+}
 .table--profiles th, .table--profiles td { padding-left: var(--s-3); padding-right: var(--s-3); }
 .table--profiles .btn--sm { padding: 0 var(--s-3); }
 .table--profiles .c-puroks { white-space: nowrap; }
+/* With the form open the list is narrower: tighter cells keep the Edit and Delete buttons inside it. */
+.profiles--open .table--profiles th, .profiles--open .table--profiles td { padding-left: var(--s-2); padding-right: var(--s-2); }
+.profiles--open .table--profiles .btn--sm { padding: 0 var(--s-2); }
 .table--profiles .c-actions { display: flex; flex-wrap: nowrap; justify-content: flex-end; gap: var(--s-2); }
 .table--profiles tr.is-editing { background: var(--accent-tint); }
 .form-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-3); }
@@ -431,7 +528,6 @@ a.house { color: inherit; text-decoration: none; }
 /* One household, one A4 page: a compact size and tight margins, and never split across pages. */
 @page { size: A4 portrait; margin: 8mm; }
 @media print {
-  .page-foot { display: none; }
   .paper { --pf: 8.4pt; max-width: none; min-width: 0; margin: 0; padding: 0; border: 0; border-radius: 0; line-height: 1.15; break-inside: avoid; page-break-inside: avoid; }
   .pf-title { margin-bottom: 3mm; }
   .pf-head { gap: 1.6mm 8mm; }

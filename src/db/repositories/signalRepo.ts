@@ -113,6 +113,22 @@ export function surveyTotals(db: Db, barangayId: number, from: string, to: strin
     .get(barangayId, from, to) as { surveys: number; containers: number; positive: number };
 }
 
+/** What the whole municipality received in a date range (all barangays together), for the weekly trends. */
+export function municipalityTotals(db: Db, from: string, to: string) {
+  const reports = db.prepare("SELECT COUNT(*) AS n FROM household_report WHERE date BETWEEN ? AND ?").get(from, to) as { n: number };
+  const symptoms = db
+    .prepare("SELECT COALESCE(SUM(checks_with_warning_signs), 0) AS warning FROM symptom_count WHERE date BETWEEN ? AND ?")
+    .get(from, to) as { warning: number };
+  const field = db
+    .prepare(
+      `SELECT COALESCE(SUM(c.total), 0) AS containers, COALESCE(SUM(c.positive), 0) AS positive
+       FROM entomological_survey s JOIN survey_container c ON c.survey_id = s.id
+       WHERE s.survey_date BETWEEN ? AND ?`,
+    )
+    .get(from, to) as { containers: number; positive: number };
+  return { reports: reports.n, warningChecks: symptoms.warning, containers: field.containers, positive: field.positive };
+}
+
 // ---- resident and symptom writes -------------------------------------------
 
 /** Adds one anonymous daily answer to the barangay's total for the day. No person is stored. */
