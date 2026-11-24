@@ -20,6 +20,8 @@ import * as v from "../validate";
 export const OFFICER_COOKIE = "aed_officer";
 export const RESIDENT_COOKIE = "aed_resident";
 const SESSION_HOURS = 8;
+/** After the officer types the password again, editing or deleting a barangay is allowed for this long. */
+export const CONFIRM_MINUTES = 5;
 const MS_HOUR = 3_600_000;
 
 export interface OfficerUser {
@@ -34,6 +36,8 @@ interface Session {
   userId: number;
   user?: OfficerUser;
   expiresAt: number;
+  /** Until when the officer's password was last confirmed (see `confirm`). */
+  confirmedUntil?: number;
 }
 
 declare global {
@@ -99,6 +103,19 @@ export class SessionManager {
     return session;
   }
 
+  /** Marks the officer's session as having just proved the password again; it counts for CONFIRM_MINUTES. */
+  confirm(req: Request): number | undefined {
+    const session = this.find(req, OFFICER_COOKIE, "officer");
+    if (!session) return undefined;
+    session.confirmedUntil = this.clock().getTime() + CONFIRM_MINUTES * 60_000;
+    return CONFIRM_MINUTES;
+  }
+
+  isConfirmed(req: Request): boolean {
+    const until = this.find(req, OFFICER_COOKIE, "officer")?.confirmedUntil;
+    return until !== undefined && until > this.clock().getTime();
+  }
+
   /** Ends the session of this request's cookie and clears the cookie. */
   end(req: Request, res: Response, cookieName: string): void {
     const raw = parseCookies(req.headers.cookie).get(cookieName);
@@ -119,6 +136,14 @@ export function requireOfficer(sessions: SessionManager): RequestHandler {
     const session = sessions.find(req, OFFICER_COOKIE, "officer");
     if (!session?.user) return next(new AppError(401, "Sign in as a health officer."));
     req.officer = session.user;
+    next();
+  };
+}
+
+/** For changes that need the password typed again (editing or deleting a barangay): 403 until the officer has confirmed it. */
+export function requireRecentPassword(sessions: SessionManager): RequestHandler {
+  return (req, _res, next) => {
+    if (!sessions.isConfirmed(req)) return next(new AppError(403, "Enter your password to manage a barangay.", { needsPassword: true }));
     next();
   };
 }
@@ -166,6 +191,16 @@ export function authRoutes(db: Db, sessions: SessionManager): Router {
     const user: OfficerUser = { id: staff.id, username: staff.username, displayName: staff.displayName, role: staff.role };
     sessions.start(res, OFFICER_COOKIE, { kind: "officer", userId: staff.id, user });
     res.json({ user });
+  });
+
+  // The signed-in officer types the password again. A wrong one is a 403 (not a 401, which would send the page to the sign-in).
+  router.post("/confirm", requireOfficer(sessions), (req, res) => {
+    const body = v.bodyObject(req.body);
+    const password = typeof body.password === "string" ? body.password : "";
+    if (password === "") throw new AppError(400, "Enter your password.");
+    const staff = findStaffByUsername(db, req.officer!.username);
+    if (!staff || !verifyPassword(password, staff.passwordHash)) throw new AppError(403, "Wrong password.");
+    res.json({ ok: true, minutes: sessions.confirm(req) });
   });
 
   router.post("/logout", (req, res) => {

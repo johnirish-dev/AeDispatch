@@ -112,6 +112,20 @@ export function longDate(date) {
   return `${p.weekday}, ${p.day} ${p.month} ${p.year}`;
 }
 
+/** "Tue, Nov 24, 2026, 6:09:00 PM" in Philippine time, the way the BHW screens write the date and time. */
+export function pillDateTime(date) {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Manila",
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+  }).format(date);
+}
+
 /** "5:12:34 PM" in Philippine time. */
 export function clockTime(date) {
   const p = parts(date, { hour: "numeric", minute: "2-digit", second: "2-digit", hour12: true });

@@ -3,7 +3,7 @@
 // list leaves them out and only the single-finding route returns them.
 
 import { Router } from "express";
-import { getFinding, listEvents, listFindings, listTasks } from "../../db/repositories/workflowRepo";
+import { EVENT_TYPES, type EventType, getFinding, listEvents, listFindings, listTasks } from "../../db/repositories/workflowRepo";
 import { AppError } from "../../errors";
 import * as v from "../../validate";
 import type { AppDeps } from "../deps";
@@ -24,7 +24,7 @@ export function activityRoutes({ db }: AppDeps): Router {
     res.json(listTasks(db));
   });
 
-  // GET /api/officer/findings?barangayId=&bhwId=&from=YYYY-MM-DD&to=YYYY-MM-DD
+  // GET /api/officer/findings?barangayId=&from=YYYY-MM-DD&to=YYYY-MM-DD
   router.get("/findings", (req, res) => {
     const from = optionalQueryDate(req.query.from, "from");
     const to = optionalQueryDate(req.query.to, "to");
@@ -32,7 +32,6 @@ export function activityRoutes({ db }: AppDeps): Router {
     res.json(
       listFindings(db, {
         barangayId: optionalQueryInt(req.query.barangayId, "barangayId"),
-        bhwId: optionalQueryInt(req.query.bhwId, "bhwId"),
         from,
         to,
       }),
@@ -47,7 +46,10 @@ export function activityRoutes({ db }: AppDeps): Router {
 
   router.get("/events", (req, res) => {
     const limit = req.query.limit === undefined ? 50 : v.int(Number(req.query.limit), "limit", 1, 200);
-    res.json(listEvents(db, limit));
+    // ?type=submission lists only the surveys that were submitted (what the Logs page shows)
+    const type = req.query.type === undefined ? undefined : String(req.query.type);
+    if (type !== undefined && !(EVENT_TYPES as readonly string[]).includes(type)) throw new AppError(400, "Unknown event type.");
+    res.json(listEvents(db, limit, type as EventType | undefined));
   });
 
   return router;

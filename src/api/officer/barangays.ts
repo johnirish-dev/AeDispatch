@@ -4,10 +4,11 @@
 import { Router } from "express";
 import { getBarangay, listBarangays } from "../../db/repositories/barangayRepo";
 import { AppError } from "../../errors";
+import { requireRecentPassword } from "../auth";
 import type { AppDeps } from "../deps";
 import { idParam } from "../http";
 
-export function barangayRoutes({ db, changes }: AppDeps): Router {
+export function barangayRoutes({ db, changes, sessions }: AppDeps): Router {
   const router = Router();
 
   router.get("/barangays", (_req, res) => {
@@ -25,15 +26,16 @@ export function barangayRoutes({ db, changes }: AppDeps): Router {
     res.status(201).json(getBarangay(db, id));
   });
 
-  // Send any of name, municipality, population, areaKm2, and the full list of purok names.
-  router.put("/barangays/:id", (req, res) => {
-    const id = idParam(req.params.id);
+  // Send any of name, municipality, population, areaKm2, and the full list of purok names. Editing and deleting need the
+  // officer's password typed again within the last few minutes (POST /api/auth/confirm).
+  router.put("/barangays/:id", requireRecentPassword(sessions), (req, res) => {
+    const id = idParam(String(req.params.id));
     changes.updateBarangay(id, req.body ?? {});
     res.json(getBarangay(db, id));
   });
 
-  router.delete("/barangays/:id", (req, res) => {
-    changes.deleteBarangay(idParam(req.params.id));
+  router.delete("/barangays/:id", requireRecentPassword(sessions), (req, res) => {
+    changes.deleteBarangay(idParam(String(req.params.id)));
     res.json({ ok: true });
   });
 

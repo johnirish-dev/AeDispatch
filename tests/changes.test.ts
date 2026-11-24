@@ -200,7 +200,8 @@ describe("BHW survey", () => {
     expect(scoreOf(db, bhw.barangayId)).toBeGreaterThan(before);
     const event = listEvents(db, 1)[0];
     expect(event.type).toBe("submission");
-    expect(event.text).toContain("Rico T. Mendoza");
+    expect(event.text).toBe("Survey submitted for Mabini (Purok 1)"); // the barangay and the purok, never the name typed on the form
+    expect(event.text).not.toContain("Rico T. Mendoza");
     expect(event.text).not.toContain("Secret Name");
     // natural containers are accepted (indoor / outdoor / natural)
     const saved = db.prepare("SELECT location FROM survey_container WHERE survey_id = ?").get(surveyId) as { location: string };
@@ -213,7 +214,7 @@ describe("BHW survey", () => {
     const { surveyId } = changes.submitSurvey(bhw.barangayId, { ...body, surveyedBy: "  Substitute   Worker " });
     const saved = db.prepare("SELECT bhw_id AS bhwId, surveyed_by AS by FROM entomological_survey WHERE id = ?").get(surveyId) as { bhwId: number | null; by: string };
     expect(saved).toEqual({ bhwId: null, by: "Substitute Worker" }); // trimmed, spaces collapsed, tied to no account
-    expect(listEvents(db, 1)[0].text).toContain("Substitute Worker");
+    expect(listEvents(db, 1)[0].text).not.toContain("Substitute Worker"); // the typed name is in the survey, not in the log
     expect(listEvents(db, 1)[0].text).not.toContain("Secret Name");
   });
 

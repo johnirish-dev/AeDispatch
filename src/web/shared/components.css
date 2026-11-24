@@ -287,12 +287,12 @@
 .chip--add { border-style: dashed; color: var(--muted); }
 
 /* ---------- tabs ---------- */
-.tabs { display: flex; gap: var(--s-5); border-bottom: 1px solid var(--line); overflow-x: auto; }
+/* the grey line under the tabs is drawn inside the bar, so the chosen tab's green line sits on it without sticking out (that 1 px made a tiny scroll bar) */
+.tabs { display: flex; gap: var(--s-5); box-shadow: inset 0 -1px 0 var(--line); overflow-x: auto; overflow-y: hidden; }
 .tab {
   padding: var(--s-3) 0;
   border: 0;
   border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
   background: transparent;
   color: var(--muted);
   white-space: nowrap;
@@ -355,7 +355,7 @@
 
 /* ---------- app shell (officer): a floating frame with a sidebar, a top bar and the page ---------- */
 .app {
-  --rail-w: 296px;
+  --rail-w: 228px;
   display: grid;
   grid-template-columns: var(--rail-w) minmax(0, 1fr);
   gap: var(--s-4);
@@ -371,16 +371,21 @@
   display: flex;
   flex-direction: column;
   height: calc(100vh - 2 * var(--s-4));
-  padding: var(--s-5) 14px var(--s-4);
-  border-radius: var(--r-xl);
-  background: var(--panel);
+  padding: 18px 8px;
+  border: 1px solid #dce2df;
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
 }
-.sidebar__head { position: relative; display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); margin-bottom: var(--s-5); padding: 0 var(--s-2); }
+.sidebar__head { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 0; padding: 2px 4px 18px; }
 .brand { display: flex; align-items: center; gap: 10px; min-width: 0; color: var(--ink); text-decoration: none; white-space: nowrap; }
 .brand__tile { display: grid; place-items: center; flex: none; transition: opacity 0.15s var(--ease-out); }
-.brand__tile img { display: block; width: 62px; height: auto; }
+.brand__tile img { display: block; width: 28px; height: 28px; }
 .brand__name { font-size: 22px; font-weight: 600; line-height: 1; letter-spacing: -0.03em; }
 .brand__ae { color: var(--brand); }
+.brand__text { display: grid; min-width: 0; }
+.brand__text strong { color: #134e3a; font-size: 15px; font-weight: 800; line-height: 1.15; }
+.brand__text span { margin-top: 2px; color: var(--muted); font-size: 11px; line-height: 1.2; }
 
 /* The sidebar button, like the one in Gemini: a rounded square at the top right. When the
    sidebar is closed it hides behind the logo and appears in its place on hover. */
@@ -389,17 +394,17 @@
   display: grid;
   place-items: center;
   flex: none;
-  width: 40px;
-  height: 40px;
+  width: 30px;
+  height: 30px;
   padding: 0;
   border: 0;
-  border-radius: var(--r-sm);
+  border-radius: 8px;
   background: transparent;
-  color: var(--ink);
+  color: #4b5563;
   cursor: pointer;
   transition: background-color 0.15s var(--ease-out), opacity 0.15s var(--ease-out), transform 0.16s var(--ease-out);
 }
-.rail-toggle .icon { width: 18px; height: 18px; stroke-width: 1; }
+.rail-toggle .icon { width: 16px; height: 16px; stroke-width: 1.2; }
 @media (hover: hover) and (pointer: fine) {
   .rail-toggle:hover { background: rgba(16, 20, 18, 0.1); }
 }
@@ -427,23 +432,24 @@
 }
 .rail-toggle:focus-visible::after { opacity: 1; }
 
-.nav-group { display: grid; gap: 2px; }
-.nav-group + .nav-group { margin-top: var(--s-5); }
-.nav-group__title { padding: 0 var(--s-3) var(--s-2); color: var(--muted); font-size: var(--fs-sm); }
+.nav-group { display: grid; gap: 6px; }
+.nav-group + .nav-group { margin-top: 14px; }
+.nav-group__title { padding: 0 12px 2px; color: var(--muted); font-size: 11px; }
 .nav a,
 .nav button {
   position: relative;
   display: flex;
   align-items: center;
-  gap: var(--s-3);
+  gap: 0;
   width: 100%;
-  overflow: hidden;
-  padding: 10px var(--s-3);
+  min-height: 38px;
+  padding: 0 12px 0 0;
   border: 0;
-  border-radius: var(--r-sm);
+  border-radius: 10px;
   background: transparent;
-  color: var(--muted);
-  font-size: var(--fs-md);
+  color: #374151;
+  font-size: 13px;
+  font-weight: 500;
   text-align: left;
   text-decoration: none;
   white-space: nowrap;
@@ -451,25 +457,23 @@
   transition: background-color 0.15s var(--ease-out), color 0.15s var(--ease-out);
 }
 @media (hover: hover) and (pointer: fine) {
-  .nav a:hover, .nav button:hover { background: rgba(23, 90, 58, 0.07); color: var(--ink); }
+  .nav a:hover, .nav button:hover { background: #f5f6f6; color: #263238; }
 }
-.nav a[aria-current="page"] { color: var(--brand-dark); font-weight: 600; }
-/* the green marker on the edge of the sidebar, as in the reference */
-.nav a[aria-current="page"]::before { content: ""; position: absolute; left: -14px; top: 8px; bottom: 8px; width: 4px; border-radius: 0 4px 4px 0; background: var(--brand); }
-.nav .icon { width: 19px; height: 19px; }
-.nav a[aria-current="page"] .icon { color: var(--brand); }
+.nav a[aria-current="page"] { background: #f1f3f3; color: #263238; font-weight: 700; }
+/* the icon sits in a 38 px cell, as in the BHW menu */
+.nav .icon { box-sizing: content-box; flex: none; width: 16px; height: 16px; padding: 11px; }
 
-/* who is signed in, and Sign out under it, at the bottom of the sidebar */
-.sidebar__foot { display: grid; gap: var(--s-1); margin-top: auto; padding-top: var(--s-4); }
-.profile { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 10px var(--s-3); }
-.avatar { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 50%; background: var(--brand-dark); color: #fff; font-size: var(--fs-sm); font-weight: 600; }
+/* who is signed in, and Sign out under it, at the bottom of the sidebar (the same card as in the BHW menu) */
+.sidebar__foot { display: grid; gap: 8px; margin-top: auto; padding-top: 14px; }
+.profile { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.avatar { display: grid; place-items: center; flex: none; width: 34px; height: 34px; border-radius: 50%; background: #155e44; color: #fff; font-size: 12px; font-weight: 700; }
 .profile__who { min-width: 0; line-height: 1.25; }
-.profile__who strong { display: block; overflow: hidden; font-size: var(--fs-md); font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
-.profile__who span { display: block; overflow: hidden; color: var(--muted); font-size: var(--fs-xs); text-overflow: ellipsis; white-space: nowrap; }
-.signout { display: flex; align-items: center; gap: var(--s-3); width: 100%; padding: 12px var(--s-3); border: 0; border-radius: var(--r-md); background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); color: var(--ink); font-size: var(--fs-md); text-align: left; white-space: nowrap; cursor: pointer; transition: background-color 0.15s var(--ease-out), color 0.15s var(--ease-out); }
-.signout .icon { width: 19px; height: 19px; }
+.profile__who strong { display: block; overflow: hidden; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.profile__who span { display: block; overflow: hidden; color: var(--muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.signout { display: flex; align-items: center; gap: 0; width: 100%; min-height: 38px; padding: 0 12px 0 0; border: 0; border-radius: 10px; background: transparent; color: #374151; font-size: 13px; font-weight: 500; text-align: left; white-space: nowrap; cursor: pointer; transition: background-color 0.15s var(--ease-out); }
+.signout .icon { box-sizing: content-box; flex: none; width: 16px; height: 16px; padding: 11px; }
 @media (hover: hover) and (pointer: fine) {
-  .signout:hover { background: var(--accent-tint); }
+  .signout:hover { background: #f5f6f6; }
 }
 .head-signout { display: none; }
 
@@ -580,20 +584,21 @@
 
 /* the sidebar when closed: the logo and the icons, and the button replaces the logo on hover */
 @media (min-width: 1100px) {
-  .app[data-rail="collapsed"] { --rail-w: 84px; }
-  .app[data-rail="collapsed"] .sidebar { padding-left: 10px; padding-right: 10px; }
-  .app[data-rail="collapsed"] .sidebar__head { justify-content: center; padding: 0; }
+  .app[data-rail="collapsed"] { --rail-w: 64px; }
+  .app[data-rail="collapsed"] .sidebar { padding: 14px 8px; }
+  .app[data-rail="collapsed"] .sidebar__head { justify-content: center; padding: 2px 0 14px; }
+  .app[data-rail="collapsed"] .brand__text,
   .app[data-rail="collapsed"] .brand__name,
   .app[data-rail="collapsed"] .nav__label,
   .app[data-rail="collapsed"] .nav-group__title,
   .app[data-rail="collapsed"] .profile__who { display: none; }
   .app[data-rail="collapsed"] .nav a,
-  .app[data-rail="collapsed"] .nav button { justify-content: center; padding: 12px 0; }
-  .app[data-rail="collapsed"] .profile { justify-content: center; padding: 8px 0; }
-  .app[data-rail="collapsed"] .signout { justify-content: center; padding: 12px 0; }
-  .app[data-rail="collapsed"] .nav a[aria-current="page"]::before { left: -10px; }
-  .app[data-rail="collapsed"] .nav-group + .nav-group { margin-top: var(--s-3); padding-top: var(--s-3); border-top: 1px solid var(--line); }
-  .app[data-rail="collapsed"] .rail-toggle { position: absolute; top: 2px; left: 50%; opacity: 0; transform: translateX(-50%); pointer-events: none; }
+  .app[data-rail="collapsed"] .nav button,
+  .app[data-rail="collapsed"] .signout { width: 38px; margin-inline: auto; padding: 0; justify-content: center; }
+  .app[data-rail="collapsed"] .profile { width: 38px; height: 38px; margin-inline: auto; padding: 0; justify-content: center; border-color: transparent; }
+  .app[data-rail="collapsed"] .avatar { width: 30px; height: 30px; }
+  .app[data-rail="collapsed"] .nav-group + .nav-group { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+  .app[data-rail="collapsed"] .rail-toggle { position: absolute; top: 4px; left: 50%; opacity: 0; transform: translateX(-50%); pointer-events: none; }
   .app[data-rail="collapsed"] .sidebar__head:hover .rail-toggle,
   .app[data-rail="collapsed"] .rail-toggle:focus-visible { opacity: 1; pointer-events: auto; }
   .app[data-rail="collapsed"] .sidebar__head:hover .brand__tile { opacity: 0; }
@@ -605,15 +610,14 @@
   .sidebar { position: static; height: auto; padding: var(--s-3) var(--s-4) 0; border-radius: 0; }
   .sidebar__head { margin-bottom: var(--s-2); padding: 0; }
   .rail-toggle { display: none; }
-  .brand__tile img { width: 48px; }
   .brand__name { font-size: 20px; }
   .nav { display: flex; flex-wrap: wrap; align-items: center; }
   .nav-group { display: flex; flex-wrap: wrap; gap: 0; }
   .nav-group + .nav-group { margin: 0; }
   .nav-group__title { display: none; }
-  .nav a, .nav button { flex: none; width: auto; padding: var(--s-3); border-radius: 0; border-bottom: 2px solid transparent; font-size: var(--fs-sm); }
-  .nav a[aria-current="page"] { border-bottom-color: var(--brand); }
-  .nav a[aria-current="page"]::before { display: none; }
+  .nav a, .nav button { flex: none; width: auto; min-height: 0; padding: var(--s-3); border-radius: 0; border-bottom: 2px solid transparent; font-size: var(--fs-sm); }
+  .nav .icon { padding: 0; margin-right: 8px; }
+  .nav a[aria-current="page"] { background: transparent; border-bottom-color: var(--brand); }
   .content { padding: var(--s-3); gap: var(--s-3); }
   .sidebar__foot { display: none; }
   .head-signout { display: inline-flex; }

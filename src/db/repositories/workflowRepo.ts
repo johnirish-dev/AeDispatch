@@ -353,10 +353,24 @@ export function addEvent(db: Db, type: EventType, text: string, at: string = now
   return Number(info.lastInsertRowid);
 }
 
-export function listEvents(db: Db, limit = 50) {
-  return db
-    .prepare("SELECT id, at, type, text FROM event_log ORDER BY at DESC, id DESC LIMIT ?")
-    .all(limit) as { id: number; at: string; type: EventType; text: string }[];
+export const EVENT_TYPES: readonly EventType[] = ["decision", "import", "submission", "weather", "params", "alert"];
+
+/**
+ * The newest events, optionally of one type. A submission never carries the surveyor's name: newer rows are written
+ * without it, and an older row ("<name> submitted a survey for Mabini (Purok 1)") is shown as "Survey submitted for
+ * Mabini (Purok 1)", because a typed name can be misspelled and is not what the log is for.
+ */
+export function listEvents(db: Db, limit = 50, type?: EventType) {
+  const rows = (
+    type === undefined
+      ? db.prepare("SELECT id, at, type, text FROM event_log ORDER BY at DESC, id DESC LIMIT ?").all(limit)
+      : db.prepare("SELECT id, at, type, text FROM event_log WHERE type = ? ORDER BY at DESC, id DESC LIMIT ?").all(type, limit)
+  ) as { id: number; at: string; type: EventType; text: string }[];
+  return rows.map((r) =>
+    r.type === "submission"
+      ? { ...r, text: r.text.replace(/^.+? submitted a survey for /, "Survey submitted for ").replace(/^.+? submitted a spot check for /, "Spot check submitted for ") }
+      : r,
+  );
 }
 
 /** When this barangay's alerts were issued since `sinceIso` (for the alert cap). */
@@ -420,28 +434,25 @@ export function listTasks(db: Db) {
 
 export interface FindingFilters {
   barangayId?: number;
-  bhwId?: number;
   /** Survey date range, inclusive (YYYY-MM-DD). */
   from?: string;
   to?: string;
   limit?: number;
 }
 
-/** Submitted surveys, newest first. Household details are NOT in this list. */
+/** Submitted surveys, newest first. Household details and the surveyor's name are NOT in this list (a typed name can be misspelled, so it is never used to group or filter). */
 export function listFindings(db: Db, f: FindingFilters = {}) {
   return db
     .prepare(
       `SELECT s.id, s.barangay_id AS barangayId, b.name AS barangayName, s.purok_id AS purokId,
               p.name AS purokName, s.house_no AS houseNo, s.survey_date AS surveyDate,
-              s.bhw_id AS bhwId, COALESCE(h.display_name, s.surveyed_by) AS bhwName, s.submitted_at AS submittedAt,
+              s.submitted_at AS submittedAt,
               COALESCE(SUM(c.total), 0) AS containers, COALESCE(SUM(c.positive), 0) AS positive
        FROM entomological_survey s
        JOIN barangay b ON b.id = s.barangay_id
        LEFT JOIN purok p ON p.id = s.purok_id
-       LEFT JOIN bhw h ON h.id = s.bhw_id
        LEFT JOIN survey_container c ON c.survey_id = s.id
        WHERE (@barangayId IS NULL OR s.barangay_id = @barangayId)
-         AND (@bhwId IS NULL OR s.bhw_id = @bhwId)
          AND (@from IS NULL OR s.survey_date >= @from)
          AND (@to IS NULL OR s.survey_date <= @to)
        GROUP BY s.id
@@ -450,7 +461,6 @@ export function listFindings(db: Db, f: FindingFilters = {}) {
     )
     .all({
       barangayId: f.barangayId ?? null,
-      bhwId: f.bhwId ?? null,
       from: f.from ?? null,
       to: f.to ?? null,
       limit: f.limit ?? 200,
@@ -462,8 +472,6 @@ export function listFindings(db: Db, f: FindingFilters = {}) {
     purokName: string | null;
     houseNo: string | null;
     surveyDate: string;
-    bhwId: number | null;
-    bhwName: string | null;
     submittedAt: string;
     containers: number;
     positive: number;

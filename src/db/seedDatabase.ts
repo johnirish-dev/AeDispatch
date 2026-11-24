@@ -389,7 +389,7 @@ export function seedDatabase(db: Db, opts: SeedOptions): SeedSummary {
           (survey_id, location, container_type, total, with_cover, without_cover, positive, larvae_count, pupae_count, created_at)
          VALUES (?, 'outdoor', 'Drum', 4, 1, 3, 1, 12, 2, ?)`,
       ).run(surveyId, submitted);
-      insEvent.run(submitted, "submission", `${sagponBhw.name} submitted a spot check for Sagpon`, submitted);
+      insEvent.run(submitted, "submission", `Spot check submitted for Sagpon`, submitted);
     }
   })();
 

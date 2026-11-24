@@ -10,11 +10,16 @@ import * as fmt from "../shared/format.js";
 import { icon } from "../shared/icons.js";
 import { mountShell } from "../shared/shell.js";
 import { strings } from "../shared/strings.js";
-import { actionCell, decisionHref, riskBadge, scoreCell, taskIcon, tier2Badge } from "./parts.js";
+import { actionCell, decisionHref, riskBadge, scoreCell, taskIcon } from "./parts.js";
 
 const t = strings.officer.overview;
 const QUEUE_HREF = "/officer/queue.html";
-const FOCUS_MAX = 3;
+// How many barangays the "Top priority" card lists depends on how tall the window is, so the card is neither stretched
+// nor left empty: three on a short laptop window, more on a tall screen (or when the browser is zoomed out).
+const focusMax = () => Math.min(8, Math.max(3, Math.floor((window.innerHeight - 380) / 88)));
+const assignmentsMax = () => Math.max(5, Math.floor(focusMax() * 1.7));
+const shownNow = { focus: 0 };
+const data = { barangays: null, assignments: null };
 
 const els = {};
 
@@ -30,8 +35,7 @@ let clockKnown = false;
 function tick() {
   if (!clockKnown) return;
   const now = new Date(Date.now() + clockOffsetMs);
-  els.date.textContent = fmt.longDate(now);
-  els.time.textContent = fmt.clockTime(now);
+  els.date.textContent = fmt.pillDateTime(now);
   els.clock.dateTime = now.toISOString();
 }
 
@@ -39,9 +43,8 @@ function tick() {
 
 function buildHeader() {
   els.weather = h("div", { class: "temp", "aria-label": t.weatherTitle }, h("span", { class: "skeleton", style: "width:140px" }));
-  els.date = h("span", { class: "clock__date" }, "–");
-  els.time = h("span", { class: "clock__time" });
-  els.clock = h("time", { class: "clock", "aria-label": t.dateLabel }, els.date, els.time);
+  els.date = h("span", {}, "–");
+  els.clock = h("time", { class: "clock", "aria-label": t.dateLabel }, h("i", { class: "clock__dot", "aria-hidden": "true" }), els.date);
   return h(
     "header",
     { class: "page-head" },
@@ -77,7 +80,7 @@ function buildStats() {
 
 function buildFocus() {
   els.focusSub = h("p", { class: "card__sub" }, " ");
-  els.focusBody = h("div", { class: "focus__body" }, ...Array.from({ length: FOCUS_MAX }, (_, i) => h("span", { class: "skeleton focus__skeleton", style: `width:${92 - i * 8}%` })));
+  els.focusBody = h("div", { class: "focus__body" }, ...Array.from({ length: 3 }, (_, i) => h("span", { class: "skeleton focus__skeleton", style: `width:${92 - i * 8}%` })));
   return h(
     "section",
     { class: "card focus", "aria-labelledby": "focus-title" },
@@ -116,7 +119,7 @@ function focusItem(b) {
     h(
       "div",
       { class: "focus__name" },
-      h("span", { class: "focus__title" }, h("a", { class: "row-link", href: decisionHref(b, "dashboard") }, b.name), tier2Badge(b)),
+      h("span", { class: "focus__title" }, h("a", { class: "row-link", href: decisionHref(b, "dashboard") }, b.name), b.tier2.unlocked ? h("span", { class: "focus__tier2" }, strings.officer.queue.tier2Badge) : null),
     ),
     h("div", { class: "focus__score" }, scoreCell(b)),
     h("div", { class: "focus__risk" }, riskBadge(b)),
@@ -127,7 +130,9 @@ function focusItem(b) {
 function renderFocus(barangays) {
   // The server's own order, then only those at or above the action threshold.
   const triggered = barangays.filter((b) => b.action === "tier1");
-  const shown = triggered.slice(0, FOCUS_MAX);
+  const shown = triggered.slice(0, focusMax());
+  shownNow.focus = focusMax();
+  data.barangays = barangays;
   clear(els.focusBody);
 
   if (shown.length === 0) {
@@ -145,7 +150,7 @@ function renderFocus(barangays) {
   }
 
   els.focusSub.textContent = t.focus.sub(shown.length, triggered.length);
-  els.focusBody.append(h("ul", { class: "focus__list" }, ...shown.map(focusItem)));
+  els.focusBody.append(h("ul", { class: "focus__list", style: `--rows:${shown.length}` }, ...shown.map(focusItem)));
   if (triggered.length > shown.length) {
     els.focusBody.append(h("a", { class: "focus__more", href: QUEUE_HREF }, t.focus.more(triggered.length - shown.length), icon("chevron")));
   }
@@ -177,12 +182,19 @@ function renderWeather(w) {
     els.weather.append(h("span", { class: "temp__main" }, t.weatherNone));
     return;
   }
+  // Measurement symbols (a thermometer, a raindrop, a clock face) and the words "Last 7 days": these are readings that
+  // were taken, not a forecast, so no sun or cloud pictures.
   els.weather.append(
-    h("span", { class: "temp__main" }, t.weatherTemp(Math.round(w.meanTempC))),
-    h("span", { class: "temp__sub" }, t.weatherRain(w.rainDays, w.rainDaysWindow)),
+    h("span", { class: "temp__tag" }, icon("history"), t.weatherPeriod),
+    h("span", { class: "temp__item" }, icon("thermometer"), h("strong", { class: "temp__main" }, t.weatherTemp(Math.round(w.meanTempC))), h("span", { class: "temp__sub" }, t.weatherTempNote)),
   );
-  // Node.append() would print "null", so the optional badge is added only when needed.
-  if (w.stale) els.weather.append(h("span", { class: "badge badge--dashed", title: w.message ?? "" }, t.staleBadge));
+  // Node.append() would print "null", so the rain part and the optional badge are added only when there is something to show.
+  if (w.rainDays !== null && w.rainDaysWindow) {
+    // one dot for each day of the window, filled for the days it rained (how many, not which ones)
+    const dots = Array.from({ length: w.rainDaysWindow }, (_, i) => h("i", { class: `temp__dot${i < w.rainDays ? " temp__dot--on" : ""}` }));
+    els.weather.append(h("span", { class: "temp__item" }, icon("droplet"), h("span", { class: "temp__sub temp__sub--ink" }, t.weatherRain(w.rainDays, w.rainDaysWindow)), h("span", { class: "temp__dots", "aria-hidden": "true" }, ...dots)));
+  }
+  if (w.stale) els.weather.append(h("span", { class: "badge badge--mod temp__stale", title: w.message ?? "" }, icon("history"), t.staleBadge));
 }
 
 function renderAssignments(list) {
@@ -191,7 +203,8 @@ function renderAssignments(list) {
     els.assignments.append(h("p", { class: "muted" }, t.assignmentsEmpty));
     return;
   }
-  const items = list.slice(0, 5).map((a) => {
+  data.assignments = list;
+  const items = list.slice(0, assignmentsMax()).map((a) => {
     const status = fmt.statusBadge(a.status);
     return h(
       "li",
@@ -236,6 +249,17 @@ main.append(buildHeader(), buildStats(), h("div", { class: "dash" }, buildFocus(
 await mountShell({ active: "overview" });
 loadAll();
 window.setInterval(tick, 1000);
+
+// A different window height (or zoom) lists a different number of rows: draw the lists again for it.
+let resizeTimer = null;
+window.addEventListener("resize", () => {
+  window.clearTimeout(resizeTimer);
+  resizeTimer = window.setTimeout(() => {
+    if (focusMax() === shownNow.focus) return;
+    if (data.barangays) renderFocus(data.barangays);
+    if (data.assignments) renderAssignments(data.assignments);
+  }, 200);
+});
 
 // Fresh numbers (and a fresh reading of the server clock) when the person comes back to this tab.
 document.addEventListener("visibilitychange", () => {

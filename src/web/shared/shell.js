@@ -9,8 +9,17 @@ import { icon, sidebarIcon } from "./icons.js";
 import { strings } from "./strings.js";
 
 /** The logo and the name, as one link to the overview. Also used on the login page. */
-export function brandLink({ href = "/officer/", disc = false } = {}) {
+export function brandLink({ href = "/officer/", disc = false, subtitle = null } = {}) {
   const c = strings.common;
+  if (!disc) {
+    // the sidebar: the small logo, the name and a line under it, the same as in the BHW screens
+    return h(
+      "a",
+      { class: "brand", href, "aria-label": c.brand },
+      h("span", { class: "brand__tile" }, h("img", { src: "/shared/logo.svg", alt: "", width: 28, height: 28 })),
+      h("span", { class: "brand__text", "aria-hidden": "true" }, h("strong", {}, c.brand), subtitle ? h("span", {}, subtitle) : null),
+    );
+  }
   return h(
     "a",
     { class: "brand", href, "aria-label": c.brand },
@@ -99,7 +108,7 @@ export async function mountShell({ active }) {
   );
 
   document.getElementById("shell-sidebar").append(
-    h("div", { class: "sidebar__head" }, brandLink(), toggle, headSignOut),
+    h("div", { class: "sidebar__head" }, brandLink({ subtitle: t.panelName }), toggle, headSignOut),
     h(
       "nav",
       { class: "nav", "aria-label": t.navLabel },

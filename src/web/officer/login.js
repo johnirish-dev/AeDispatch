@@ -11,6 +11,7 @@ setSignInPage(null);
 
 const username = h("input", { class: "input", id: "username", name: "username", autocomplete: "username", required: true });
 const password = h("input", { class: "input input--toggle", id: "password", name: "password", type: "password", autocomplete: "current-password", required: true });
+// An eye shows or hides the password: an open eye to show it, a crossed eye to hide it again.
 const reveal = h(
   "button",
   {
@@ -18,14 +19,19 @@ const reveal = h(
     type: "button",
     "aria-pressed": "false",
     "aria-controls": "password",
+    "aria-label": t.showPassword,
+    title: t.showPassword,
     onclick: () => {
       const showing = password.type === "text";
       password.type = showing ? "password" : "text";
-      reveal.textContent = showing ? t.showPassword : t.hidePassword;
+      reveal.replaceChildren(icon(showing ? "eye" : "eyeOff"));
+      const label = showing ? t.showPassword : t.hidePassword;
+      reveal.setAttribute("aria-label", label);
+      reveal.title = label;
       reveal.setAttribute("aria-pressed", String(!showing));
     },
   },
-  t.showPassword,
+  icon("eye"),
 );
 const error = h("p", { class: "banner banner--error", role: "alert", hidden: true });
 const submit = h("button", { class: "btn btn--primary btn--block", type: "submit" }, t.submit);

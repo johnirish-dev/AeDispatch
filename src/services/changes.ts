@@ -336,7 +336,7 @@ export class DataChanges {
         else if (taskStatus === "new") updateTaskStatus(this.db, taskId, "in_progress", submittedAt);
       }
       // The log never carries the household details: only who, where, when.
-      addEvent(this.db, "submission", `${surveyedBy} submitted a survey for ${this.barangayName(barangayId)} (${purok.name})`, submittedAt);
+      addEvent(this.db, "submission", `Survey submitted for ${this.barangayName(barangayId)} (${purok.name})`, submittedAt);
       return id;
     })();
 

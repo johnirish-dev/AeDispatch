@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { RESIDENT_COOKIE, SessionManager, requireResident } from "../src/api/auth";
 import { createApp } from "../src/app";
 import { listBarangays } from "../src/db/repositories/barangayRepo";
+import { OFFICER_PASSWORD } from "../src/db/seedDatabase";
 import { latestScoreFor } from "../src/db/repositories/scoreRepo";
 import { insertSurvey } from "../src/db/repositories/workflowRepo";
 import { DataChanges } from "../src/services/changes";
@@ -493,7 +494,8 @@ describe("BHW survey through the API", () => {
       expect(mine).toMatchObject({ barangayName: "Mabini", positive: 45, containers: 50 });
       expect(mine.headOfFamily).toBeUndefined(); // the list never carries household details
       const events = (await officer.get("/api/officer/events")).body as { text: string }[];
-      expect(events[0].text).toContain("Rico T. Mendoza");
+      expect(events[0].text).toMatch(/^Survey submitted for Mabini \(/); // the barangay, never the surveyor's name
+      expect(JSON.stringify(events)).not.toContain("Rico T. Mendoza");
       expect(JSON.stringify(events)).not.toContain("Private Name");
     } finally {
       await api.close();
@@ -645,6 +647,19 @@ describe("barangay profiles through the API", () => {
       expect(created.body.puroks).toHaveLength(2);
       expect((await ranking(officer)).barangays.some((b) => b.name === "Sample New")).toBe(true);
 
+      // editing and deleting need the password typed again
+      const blocked = await officer.put(`/api/officer/barangays/${created.body.id}`, { population: 4000 });
+      expect(blocked.status).toBe(403);
+      expect(blocked.body.needsPassword).toBe(true);
+      expect((await officer.delete(`/api/officer/barangays/${created.body.id}`)).status).toBe(403);
+      expect((await officer.post("/api/auth/confirm", { password: "not-the-password" })).status).toBe(403);
+      expect((await officer.post("/api/auth/confirm", {})).status).toBe(400);
+      expect((await api.client().post("/api/auth/confirm", { password: OFFICER_PASSWORD })).status).toBe(401); // needs the sign-in first
+      expect((await officer.put(`/api/officer/barangays/${created.body.id}`, { population: 4000 })).status).toBe(403); // a wrong try confirms nothing
+      const confirmed = await officer.post("/api/auth/confirm", { password: OFFICER_PASSWORD });
+      expect(confirmed.status).toBe(200);
+      expect(confirmed.body).toMatchObject({ ok: true, minutes: 5 });
+
       const edited = await officer.put(`/api/officer/barangays/${created.body.id}`, { population: 4000, puroks: ["Purok 1", "Purok 2", "Purok 3"] });
       expect(edited.status).toBe(200);
       expect(edited.body.population).toBe(4000);
@@ -654,6 +669,11 @@ describe("barangay profiles through the API", () => {
       expect((await ranking(officer)).barangays.some((b) => b.name === "Sample New")).toBe(false);
       expect((await officer.get(`/api/officer/barangays/${created.body.id}`)).status).toBe(404);
       expect((await officer.delete(`/api/officer/barangays/${created.body.id}`)).status).toBe(404);
+
+      // the password counts for five minutes only
+      api.advance(6 * 60_000);
+      const again = await officer.put(`/api/officer/barangays/${created.body.id}`, { population: 1 });
+      expect(again.status).toBe(403);
     } finally {
       await api.close();
     }
@@ -695,7 +715,7 @@ describe("activity and dispatches", () => {
   });
 
   it("filters the findings by barangay, BHW and date range", async () => {
-    const all = (await officer.get("/api/officer/findings")).body as { barangayId: number; bhwId: number; surveyDate: string }[];
+    const all = (await officer.get("/api/officer/findings")).body as { barangayId: number; surveyDate: string }[];
     expect(all.length).toBeGreaterThan(5);
     const barangayId = all[0].barangayId;
     const one = (await officer.get(`/api/officer/findings?barangayId=${barangayId}`)).body as { barangayId: number }[];
@@ -703,9 +723,8 @@ describe("activity and dispatches", () => {
     expect(one.every((f) => f.barangayId === barangayId)).toBe(true);
     expect(one.length).toBeLessThan(all.length);
 
-    const bhwId = all.find((f) => f.bhwId)!.bhwId;
-    const byBhw = (await officer.get(`/api/officer/findings?bhwId=${bhwId}`)).body as { bhwId: number }[];
-    expect(byBhw.every((f) => f.bhwId === bhwId)).toBe(true);
+    // the list says nothing about who did the survey: a typed name can be misspelled, so it is never shown, grouped or filtered on
+    expect(all.every((f) => !("bhwId" in f) && !("bhwName" in f) && !("surveyedBy" in f))).toBe(true);
 
     const range = (await officer.get("/api/officer/findings?from=2026-11-10&to=2026-11-15")).body as { surveyDate: string }[];
     expect(range.every((f) => f.surveyDate >= "2026-11-10" && f.surveyDate <= "2026-11-15")).toBe(true);
@@ -883,6 +902,35 @@ describe("the BHW's list of recent surveys", () => {
       const mine = new Set((await list(a.phone)).map((r) => barangayOf(r.purokId)));
       expect(mine.size).toBe(1);
       expect(new Set((await list(other.phone)).map((r) => barangayOf(r.purokId))).has([...mine][0])).toBe(false);
+    } finally {
+      await api.close();
+    }
+  });
+
+  it("logs a submission without the surveyor's name, and the Logs list can be limited to submissions", async () => {
+    const api = await startApi();
+    try {
+      const { phone, me } = await open(api, "Mabini");
+      const purok = (api.db.prepare("SELECT name FROM purok WHERE id = ?").get(me.puroks[0].id) as { name: string }).name;
+      await phone.post("/api/bhw/surveys", payload(me.puroks[0].id));
+      // an older row that still has a name in it, and events that come from other places (weather, weights)
+      const insert = api.db.prepare("INSERT INTO event_log (at, type, text, created_at) VALUES (?, ?, ?, ?)");
+      insert.run("2026-11-01T00:00:00.000Z", "submission", "Jane Doe submitted a survey for Mabini (Purok 1)", "2026-11-01T00:00:00.000Z");
+      insert.run("2026-11-02T00:00:00.000Z", "weather", "Weather simulator applied for Daraga: custom values", "2026-11-02T00:00:00.000Z");
+      insert.run("2026-11-02T00:00:00.000Z", "params", "Weight version 2 saved", "2026-11-02T00:00:00.000Z");
+      const officer = await api.officer();
+
+      const subs = (await officer.get("/api/officer/events?type=submission")).body as { type: string; text: string }[];
+      expect(subs.every((e) => e.type === "submission")).toBe(true);
+      expect(subs.map((e) => e.text)).toContain(`Survey submitted for Mabini (${purok})`);
+      expect(subs.map((e) => e.text)).toContain("Survey submitted for Mabini (Purok 1)"); // the old row, without "Jane Doe"
+      const text = JSON.stringify(subs);
+      for (const secret of ["Typed Surveyor", "Jane Doe", "Weather", "Weight"]) expect(text, secret).not.toContain(secret);
+
+      // without a type the timeline is as before (every kind of event); a made-up type is refused
+      const all = (await officer.get("/api/officer/events?limit=200")).body as { type: string }[];
+      expect(new Set(all.map((e) => e.type)).has("weather")).toBe(true);
+      expect((await officer.get("/api/officer/events?type=nonsense")).status).toBe(400);
     } finally {
       await api.close();
     }

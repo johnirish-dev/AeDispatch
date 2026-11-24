@@ -53,8 +53,7 @@ function row(b) {
     h(
       "td",
       { class: "c-actions" },
-      h("button", { class: "btn btn--sm", type: "button", "aria-label": t.editLabel(b.name), onclick: () => startEdit(b) }, t.edit),
-      h("button", { class: "btn btn--sm btn--danger", type: "button", "aria-label": t.deleteLabel(b.name), onclick: () => askDelete(b) }, t.delete),
+      h("button", { class: "btn btn--sm", type: "button", "aria-label": t.manageLabel(b.name), onclick: () => manage(b) }, t.manage),
     ),
   );
 }
@@ -215,6 +214,7 @@ function openPanel(title, values, id) {
   setPurokError(null);
   showErrors({});
   els.formError.hidden = true;
+  els.deleteZone.hidden = id === null; // there is nothing to delete while a new barangay is being added
   els.form.hidden = false;
   els.panel.hidden = false;
   els.layout.classList.add("profiles--open");
@@ -223,6 +223,13 @@ function openPanel(title, values, id) {
   if (state.list) renderRows();
   els.panel.scrollIntoView({ block: "nearest", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
   els.name.focus();
+}
+
+// One word for both: "Manage" opens the barangay, and inside it are the fields to change and the button to delete it. The
+// password is asked once, before it opens, and then counts for a few minutes (the server checks it for both).
+async function manage(b) {
+  if (!(await askPassword(b.name))) return;
+  startEdit(b);
 }
 
 function startEdit(b) {
@@ -258,7 +265,7 @@ async function save(event) {
   els.formError.hidden = true;
   try {
     if (isNew) await post("/api/officer/barangays", values);
-    else await put(`/api/officer/barangays/${state.editing.id}`, values);
+    else await withPassword(values.name, () => put(`/api/officer/barangays/${state.editing.id}`, values));
     closePanel();
     await load();
     showBanner("success", isNew ? t.added(values.name) : t.saved(values.name));
@@ -276,6 +283,84 @@ async function save(event) {
     els.saveBtn.disabled = false;
     els.saveBtn.textContent = t.save;
   }
+}
+
+// ---- the password: managing a barangay (editing or deleting it) asks the officer to type it again ----------------
+
+let confirmedUntil = 0; // when the last confirmation runs out (the server keeps its own clock and has the final say)
+let passwordDone = null;
+let passwordOk = false;
+
+function askPassword(name) {
+  if (Date.now() < confirmedUntil) return Promise.resolve(true);
+  els.pwTitle.textContent = t.password.title(name);
+  els.pwInput.value = "";
+  els.pwError.hidden = true;
+  passwordOk = false;
+  els.pw.showModal();
+  els.pwInput.focus();
+  return new Promise((resolve) => {
+    passwordDone = resolve;
+  });
+}
+
+async function submitPassword(event) {
+  event.preventDefault();
+  els.pwSubmit.disabled = true;
+  els.pwError.hidden = true;
+  try {
+    const result = await post("/api/auth/confirm", { password: els.pwInput.value });
+    confirmedUntil = Date.now() + result.minutes * 60_000 - 10_000;
+    passwordOk = true;
+    els.pw.close();
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 401) return;
+    els.pwError.textContent = err instanceof ApiError && err.status === 403 ? t.password.wrong : err.message || strings.common.serverError;
+    els.pwError.hidden = false;
+    els.pwInput.select();
+  } finally {
+    els.pwSubmit.disabled = false;
+  }
+}
+
+/** Runs a change; if the server says the password has run out, asks for it again once and then tries again. */
+async function withPassword(name, action) {
+  try {
+    return await action();
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 403 && err.body?.needsPassword) {
+      confirmedUntil = 0;
+      if (await askPassword(name)) return action();
+    }
+    throw err;
+  }
+}
+
+function buildPassword() {
+  els.pwTitle = h("h2", { id: "pw-title" });
+  els.pwInput = h("input", { class: "input", id: "pw-input", type: "password", autocomplete: "current-password", required: true });
+  els.pwError = h("p", { class: "field__error", role: "alert", hidden: true });
+  els.pwError.style.display = "block";
+  els.pwSubmit = h("button", { class: "btn btn--primary", type: "submit" }, t.password.go);
+  els.pw = h(
+    "dialog",
+    { class: "card confirm", "aria-labelledby": "pw-title" },
+    h(
+      "form",
+      { novalidate: true, onsubmit: submitPassword },
+      els.pwTitle,
+      h("p", { class: "muted" }, t.password.body),
+      h("div", { class: "field", style: "margin-top: var(--s-3)" }, h("label", { class: "field__label", for: "pw-input" }, t.password.label), els.pwInput),
+      els.pwError,
+      h("div", { class: "import__actions" }, els.pwSubmit, h("button", { class: "btn", type: "button", onclick: () => els.pw.close() }, t.cancel)),
+    ),
+  );
+  els.pw.addEventListener("close", () => {
+    const done = passwordDone;
+    passwordDone = null;
+    if (done) done(passwordOk);
+  });
+  return els.pw;
 }
 
 // ---- delete: always asks first -----------------------------------------------------------------
@@ -296,7 +381,7 @@ async function confirmDelete() {
   els.confirmBtn.disabled = true;
   els.confirmBtn.textContent = t.deleting;
   try {
-    await del(`/api/officer/barangays/${b.id}`);
+    await withPassword(b.name, () => del(`/api/officer/barangays/${b.id}`));
     els.confirm.close();
     if (state.editing?.id === b.id) closePanel();
     await load();
@@ -402,6 +487,13 @@ function buildPanel() {
       ),
       els.formError,
       h("div", { class: "import__actions" }, els.saveBtn, h("button", { class: "btn", type: "button", onclick: closePanel }, t.cancel)),
+      // the delete button lives inside the barangay it deletes, under the fields
+      (els.deleteZone = h(
+        "div",
+        { class: "danger-zone", hidden: true },
+        h("p", { class: "muted" }, t.deleteZoneNote),
+        h("button", { class: "btn btn--danger", type: "button", onclick: () => { const b = state.list?.find((x) => x.id === state.editing?.id); if (b) askDelete(b); } }, t.deleteConfirm),
+      )),
     ),
   );
   // The panel is only on the page while a barangay is being added or edited; otherwise the list has the full width.
@@ -437,6 +529,7 @@ document.getElementById("main").append(
   els.banners,
   (els.layout = h("div", { class: "profiles" }, buildList(), buildPanel())),
   buildConfirm(),
+  buildPassword(),
 );
 await mountShell({ active: "profiles" });
 load();

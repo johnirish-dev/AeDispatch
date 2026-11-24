@@ -17,7 +17,7 @@ const t = strings.officer.activity;
 const EVENTS_STEP = 10;
 const dash = strings.common.none;
 
-const state = { findings: null, capped: false, bhw: "", from: "", to: "", positiveOnly: false, house: "", events: [], eventsShown: EVENTS_STEP, municipality: new Map() };
+const state = { findings: null, capped: false, from: "", to: "", positiveOnly: false, house: "", events: [], eventsShown: EVENTS_STEP, municipality: new Map() };
 const els = {};
 let renderToken = 0;
 /** Counts print jobs; a newer one (or leaving the barangay) cancels the one being prepared. */
@@ -145,16 +145,96 @@ const csvCell = (value) => {
   return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 };
 
-/** The households as a file (UTF-8 with a mark so a spreadsheet reads the ñ in Peñafrancia). */
-function exportCsv(rows) {
-  const lines = [t.csvHeader, ...rows.map((f) => [f.barangayName, f.purokName, f.houseNo, f.surveyDate, f.bhwName, f.positive, f.containers].map(csvCell).join(","))];
-  const url = URL.createObjectURL(new Blob(["﻿" + lines.join("\r\n") + "\r\n"], { type: "text/csv;charset=utf-8" }));
-  const link = h("a", { href: url, download: t.csvName });
+/** The households as a CSV (UTF-8 with a mark so a spreadsheet reads the ñ in Peñafrancia). */
+function csvBlob(rows) {
+  const lines = [t.csvHeader, ...rows.map((f) => [f.barangayName, f.purokName, f.houseNo, f.surveyDate, f.positive, f.containers].map(csvCell).join(","))];
+  return new Blob(["﻿" + lines.join("\r\n") + "\r\n"], { type: "text/csv;charset=utf-8" });
+}
+
+const todayStamp = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+
+/** A file name made of letters and spaces: nothing a file system refuses, no ".csv" (it is added), at most 100 characters. */
+const cleanName = (raw) =>
+  String(raw ?? "")
+    .replace(/[\\/:*?"<>|\u0000-\u001f]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\.csv$/i, "")
+    .replace(/[. ]+$/, "")
+    .slice(0, 100);
+
+/** "Bascaran findings 2026-11-24", with the date range and "positive only" when those filters are on. */
+function exportName(place, { from = "", to = "", positiveOnly = false } = {}) {
+  const p = t.exportPanel;
+  const range = from !== "" || to !== "" ? ` (${from || "…"} to ${to || "…"})` : "";
+  return cleanName(`${place} ${p.findingsWord} ${todayStamp()}${range}${positiveOnly ? ` ${p.positiveOnlyName}` : ""}`);
+}
+
+const canChooseFolder = () => window.isSecureContext && typeof window.showSaveFilePicker === "function";
+
+/** Writes the file. Where the browser allows it (Chrome and Edge on localhost or https) a Save as window lets the person choose the folder. */
+async function saveCsv(rows, name) {
+  const blob = csvBlob(rows);
+  const file = `${name}.csv`;
+  if (canChooseFolder()) {
+    try {
+      const handle = await window.showSaveFilePicker({ suggestedName: file, types: [{ description: "CSV file", accept: { "text/csv": [".csv"] } }] });
+      const out = await handle.createWritable();
+      await out.write(blob);
+      await out.close();
+      return "saved";
+    } catch (err) {
+      if (err?.name === "AbortError") return "cancelled"; // the Save as window was closed
+      // anything else: fall back to the normal download below
+    }
+  }
+  const url = URL.createObjectURL(blob);
+  const link = h("a", { href: url, download: file });
   document.body.append(link);
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
-  announce(t.exported(rows.length));
+  return "saved";
+}
+
+/** The small panel where the file name can be changed before the file is made. */
+function askExport({ rows, baseName, subject, opener }) {
+  const p = t.exportPanel;
+  const input = h("input", { class: "input", id: "export-name", value: baseName, maxlength: "100", autocomplete: "off", spellcheck: "false" });
+  const go = h("button", { class: "btn btn--primary", type: "button" }, p.go);
+  const cancel = h("button", { class: "btn", type: "button", onclick: () => dialog.close() }, p.cancel);
+  const dialog = h(
+    "dialog",
+    { class: "card confirm export", "aria-labelledby": "export-title" },
+    h("h2", { id: "export-title" }, p.title),
+    h("p", { class: "muted" }, p.summary(rows.length, subject)),
+    h("div", { class: "field" }, h("label", { class: "field__label", for: "export-name" }, p.nameLabel), h("div", { class: "export__name" }, input, h("span", { class: "export__ext", "aria-hidden": "true" }, ".csv"))),
+    h("p", { class: "muted export__where" }, canChooseFolder() ? p.whereChoose : p.whereDownloads),
+    h("div", { class: "import__actions" }, go, cancel),
+  );
+  const run = async () => {
+    const name = cleanName(input.value) || baseName;
+    go.disabled = true;
+    const result = await saveCsv(rows, name);
+    go.disabled = false;
+    if (result === "cancelled") return;
+    dialog.close();
+    announce(t.exported(rows.length, `${name}.csv`));
+  };
+  go.onclick = run;
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      run();
+    }
+  });
+  dialog.addEventListener("close", () => {
+    dialog.remove();
+    opener?.focus();
+  });
+  document.body.append(dialog);
+  dialog.showModal();
+  input.select();
 }
 
 async function renderFindings(token) {
@@ -171,7 +251,7 @@ async function renderFindings(token) {
       return;
     }
     exportBtn.disabled = false;
-    exportBtn.onclick = () => exportCsv(findings);
+    exportBtn.onclick = () => askExport({ rows: findings, baseName: exportName(t.exportPanel.fileAll), subject: t.exportPanel.allBarangays, opener: exportBtn });
     if (state.capped) body.append(capNote());
     body.append(
       h(
@@ -215,9 +295,9 @@ function feedGroups(list) {
   const days = new Map();
   for (const f of list) {
     if (!days.has(f.surveyDate)) days.set(f.surveyDate, new Map());
-    const key = `${f.purokId}:${f.bhwId}`;
+    const key = String(f.purokId); // by purok only: a typed surveyor name can be misspelled, so it never splits the groups
     const inspections = days.get(f.surveyDate);
-    if (!inspections.has(key)) inspections.set(key, { purok: f.purokName, bhw: f.bhwName, households: [] });
+    if (!inspections.has(key)) inspections.set(key, { purok: f.purokName, households: [] });
     inspections.get(key).households.push(f);
   }
   return [...days.entries()]
@@ -347,7 +427,7 @@ function clearPrintArea() {
 }
 
 async function renderBarangay(id, token) {
-  state.bhw = state.from = state.to = state.house = "";
+  state.from = state.to = state.house = "";
   state.positiveOnly = false;
   const body = h("div", { style: "margin-top: var(--s-4)" }, loading());
   const title = h("div", { class: "card__head" }, heading("", "findings-title"));
@@ -365,18 +445,18 @@ async function renderBarangay(id, token) {
     title.querySelector("h2").textContent = rows[0].barangayName;
     title.append(exportBtn);
 
-    const bhws = [...new Map(rows.map((f) => [String(f.bhwId), f.bhwName ?? dash])).entries()].sort((a, b) => a[1].localeCompare(b[1]));
-    const bhwSel = h("select", { class: "select", id: "f-bhw", onchange: () => { state.bhw = bhwSel.value; update(); } }, h("option", { value: "" }, t.filters.bhwAll), ...bhws.map(([v, label]) => h("option", { value: v }, label)));
     const fromIn = h("input", { class: "input", type: "date", id: "f-from", onchange: () => { state.from = fromIn.value; update(); } });
     const toIn = h("input", { class: "input", type: "date", id: "f-to", onchange: () => { state.to = toIn.value; update(); } });
     const clearBtn = h("button", { class: "btn btn--link", type: "button", hidden: true, onclick: () => {
-      state.bhw = state.from = state.to = state.house = "";
+      state.from = state.to = state.house = "";
       state.positiveOnly = false;
-      bhwSel.value = fromIn.value = toIn.value = houseIn.value = "";
-      positiveIn.checked = false;
+      fromIn.value = toIn.value = houseIn.value = "";
       update();
     } }, t.filters.clear);
-    const positiveIn = h("input", { type: "checkbox", onchange: () => { state.positiveOnly = positiveIn.checked; update(); } });
+    // Two choices side by side, each with how many households it shows (after the date filter), instead of a checkbox.
+    const segAll = h("button", { class: "seg__btn", type: "button", onclick: () => { state.positiveOnly = false; update(); } });
+    const segPositive = h("button", { class: "seg__btn", type: "button", onclick: () => { state.positiveOnly = true; update(); } });
+    const seg = h("div", { class: "seg", role: "group", "aria-label": t.seg.label }, segAll, segPositive);
     const houseIn = h("input", { class: "input", type: "search", id: "f-house", autocomplete: "off", oninput: () => { state.house = houseIn.value; update(); } });
     const totals = h("p", { class: "muted", role: "status" });
     const summary = h("div");
@@ -386,14 +466,13 @@ async function renderBarangay(id, token) {
     const printBar = h("div", { class: "print-bar", hidden: true });
     const lab = (text, forId, control) => h("div", { class: "field" }, h("label", { class: "field__label", for: forId }, text), control);
 
-    let scope = rows; // the date and BHW filters: what the figures are about
+    let scope = rows; // the date filters: what the figures are about
     let shown = rows; // scope, plus "positive only" and the house search: what the feed, the export and the print use
 
     /** The filters in words, for the cover page. */
     function scopeText() {
       const parts = [];
       if (state.from !== "" || state.to !== "") parts.push(t.cover.dates(state.from, state.to));
-      if (state.bhw !== "") parts.push(t.cover.bhw(bhws.find(([v]) => v === state.bhw)?.[1] ?? dash));
       if (state.positiveOnly) parts.push(t.cover.positiveOnly);
       if (state.house.trim() !== "") parts.push(t.cover.house(state.house.trim()));
       return parts.length > 0 ? parts.join(" · ") : t.cover.all;
@@ -433,9 +512,16 @@ async function renderBarangay(id, token) {
     function update() {
       closePrintBar();
       clear(feed);
-      scope = rows.filter((f) => (state.bhw === "" || String(f.bhwId) === state.bhw) && (state.from === "" || f.surveyDate >= state.from) && (state.to === "" || f.surveyDate <= state.to));
+      scope = rows.filter((f) => (state.from === "" || f.surveyDate >= state.from) && (state.to === "" || f.surveyDate <= state.to));
       const needle = state.house.trim().toLowerCase();
       shown = scope.filter((f) => (!state.positiveOnly || f.positive > 0) && (needle === "" || String(f.houseNo ?? "").toLowerCase().includes(needle)));
+      const withPositive = scope.filter((f) => f.positive > 0).length;
+      segAll.replaceChildren(t.seg.all, h("span", { class: "seg__count" }, String(scope.length)));
+      segPositive.replaceChildren(t.seg.positive, h("span", { class: "seg__count" }, String(withPositive)));
+      segAll.classList.toggle("is-on", !state.positiveOnly);
+      segPositive.classList.toggle("is-on", state.positiveOnly);
+      segAll.setAttribute("aria-pressed", String(!state.positiveOnly));
+      segPositive.setAttribute("aria-pressed", String(state.positiveOnly));
       clear(summary);
       summary.append(summaryStrip(scope));
       clear(puroks);
@@ -443,7 +529,7 @@ async function renderBarangay(id, token) {
       exportBtn.disabled = shown.length === 0;
       printBtn.disabled = shown.length === 0;
       printBtn.replaceChildren(icon("file"), t.print.button(shown.length));
-      clearBtn.hidden = state.bhw === "" && state.from === "" && state.to === "" && state.house === "" && !state.positiveOnly;
+      clearBtn.hidden = state.from === "" && state.to === "" && state.house === "" && !state.positiveOnly;
       totals.textContent = t.totals(shown.length, sum(shown, "positive"), sum(shown, "containers"));
       if (shown.length === 0) {
         feed.append(h("p", { class: "empty" }, t.findingsNoMatch));
@@ -459,7 +545,7 @@ async function renderBarangay(id, token) {
               h(
                 "details",
                 { class: "inspection", open: i.households.length <= OPEN_UP_TO },
-                h("summary", { class: "inspection__head" }, h("strong", {}, i.purok ?? dash), h("span", { class: "muted" }, `${i.bhw ?? dash} · ${t.households(i.households.length)} · ${t.positiveOf(sum(i.households, "positive"), sum(i.households, "containers"))} ${t.positiveWord}`)),
+                h("summary", { class: "inspection__head" }, h("strong", {}, i.purok ?? dash), h("span", { class: "muted" }, `${t.households(i.households.length)} · ${t.positiveOf(sum(i.households, "positive"), sum(i.households, "containers"))} ${t.positiveWord}`)),
                 h("div", { class: "houses" }, ...i.households.map(householdLink)),
               ),
             ),
@@ -468,14 +554,14 @@ async function renderBarangay(id, token) {
       });
     }
 
-    exportBtn.onclick = () => exportCsv(shown);
+    exportBtn.onclick = () => askExport({ rows: shown, baseName: exportName(rows[0].barangayName, { from: state.from, to: state.to, positiveOnly: state.positiveOnly }), subject: rows[0].barangayName, opener: exportBtn });
     if (state.capped) body.append(capNote());
     body.append(
-      h("div", { class: "filters filters--three" }, lab(t.filters.from, "f-from", fromIn), lab(t.filters.to, "f-to", toIn), lab(t.filters.bhw, "f-bhw", bhwSel)),
+      h("div", { class: "filters filters--two" }, lab(t.filters.from, "f-from", fromIn), lab(t.filters.to, "f-to", toIn)),
       summary,
       puroks,
-      h("div", { class: "feed__bar" }, h("h3", { class: "feed__title" }, t.feedTitle), h("div", { class: "feed__toggles" }, h("button", { class: "btn btn--sm", type: "button", onclick: () => feed.querySelectorAll("details").forEach((d) => (d.open = true)) }, t.expandAll), h("button", { class: "btn btn--sm", type: "button", onclick: () => feed.querySelectorAll("details").forEach((d) => (d.open = false)) }, t.collapseAll))),
-      h("div", { class: "feed-controls" }, h("label", { class: "check" }, positiveIn, h("span", {}, t.positiveOnly)), lab(t.houseSearch, "f-house", houseIn), printBtn),
+      h("div", { class: "feed__bar" }, h("h3", { class: "feed__title" }, t.feedTitle)),
+      h("div", { class: "feed-controls" }, h("div", { class: "field" }, h("span", { class: "field__label" }, t.seg.label), seg), lab(t.houseSearch, "f-house", houseIn), printBtn),
       printBar,
       h("div", { class: "filters__foot" }, totals, clearBtn),
       feed,
@@ -638,6 +724,51 @@ function formArticle(f) {
   );
 }
 
+// The paper form, with zoom buttons like the BHW screens: "Fit page" fits it to the width of the window, and the buttons
+// make it smaller or bigger. Only what is on the screen is scaled; printing always uses the real size.
+const PAPER_WIDTH = 860;
+let zoomResize = null;
+
+function formViewer(f) {
+  if (zoomResize) window.removeEventListener("resize", zoomResize);
+  let zoom = 1;
+  const article = formArticle(f);
+  const stage = h("div", { class: "pf-stage" }, article);
+  const shell = h("div", { class: "pf-shell" }, stage);
+  const viewport = h("div", { class: "pf-scroll pf-viewport" }, shell);
+  const level = h("span", { class: "zoom__level", "aria-live": "polite" }, t.zoom.fitLevel);
+  const apply = () => {
+    const fit = Math.min(1, Math.max(1, viewport.clientWidth - 4) / PAPER_WIDTH);
+    const scale = Math.min(2, Math.max(0.35, fit * zoom));
+    stage.style.width = `${PAPER_WIDTH}px`;
+    stage.style.transform = `scale(${scale})`;
+    shell.style.width = `${PAPER_WIDTH * scale}px`;
+    shell.style.height = `${article.offsetHeight * scale}px`;
+    level.textContent = zoom === 1 ? t.zoom.fitLevel : `${Math.round(scale * 100)}%`;
+  };
+  const step = (delta) => () => {
+    zoom = delta === 0 ? 1 : Math.min(2, Math.max(0.7, Number((zoom + delta).toFixed(2))));
+    apply();
+  };
+  zoomResize = () => window.requestAnimationFrame(apply);
+  window.addEventListener("resize", zoomResize);
+  window.requestAnimationFrame(apply);
+  const controls = h(
+    "div",
+    { class: "paper-tools no-print" },
+    h("span", { class: "paper-tools__title" }, t.zoom.title),
+    h(
+      "div",
+      { class: "zoom", role: "group", "aria-label": t.zoom.label },
+      h("button", { class: "zoom__btn", type: "button", "aria-label": t.zoom.out, onclick: step(-0.15) }, "−"),
+      h("button", { class: "zoom__btn", type: "button", onclick: step(0) }, t.zoom.fit),
+      level,
+      h("button", { class: "zoom__btn", type: "button", "aria-label": t.zoom.in, onclick: step(0.15) }, "+"),
+    ),
+  );
+  return h("div", { class: "pf-viewer" }, controls, viewport);
+}
+
 async function renderFinding(id, token) {
   const slot = h("div", {}, loading());
   els.view.append(slot);
@@ -645,7 +776,10 @@ async function renderFinding(id, token) {
     const [f] = await Promise.all([get(`/api/officer/findings/${id}`), els.municipalityReady]);
     if (token !== renderToken) return;
     clear(slot);
-    slot.append(h("div", { class: "view-bar no-print" }, back(`#findings/${f.barangayId}`, t.backToBarangay(f.barangayName)), h("button", { class: "btn btn--primary", type: "button", onclick: () => window.print() }, icon("file"), t.print.single)), h("div", { class: "pf-scroll" }, formArticle(f)));
+    slot.append(
+      h("div", { class: "view-bar no-print" }, back(`#findings/${f.barangayId}`, t.backToBarangay(f.barangayName)), h("button", { class: "btn btn--primary", type: "button", onclick: () => window.print() }, icon("file"), t.print.single)),
+      formViewer(f),
+    );
     focusHeading();
   } catch (err) {
     if (err instanceof ApiError && err.status === 401) return;
@@ -662,7 +796,7 @@ async function renderLogs(token) {
   const body = h("div", { style: "margin-top: var(--s-4)" }, loading());
   els.view.append(back("#", t.backToActivity), h("section", { class: "card", "aria-labelledby": "logs-title" }, heading(t.logsTitle, "logs-title"), h("p", { class: "card__sub" }, t.logsSub), body));
   try {
-    state.events = await get("/api/officer/events?limit=50");
+    state.events = await get("/api/officer/events?limit=50&type=submission"); // only the surveys that were submitted
     if (token !== renderToken) return;
     const timeline = h("ul", { class: "timeline" });
     const more = h("button", { class: "btn btn--sm", type: "button", hidden: true, onclick: () => { state.eventsShown += EVENTS_STEP; draw(); } });
