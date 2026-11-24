@@ -55,7 +55,8 @@ const TABLES = [
 const HEAD_NAMES = ["A. Dela Cruz", "B. Garcia", "C. Mendoza", "D. Villanueva", "E. Bautista", "F. Aquino",
   "G. Ramos", "H. Torres", "I. Navarro", "J. Castillo", "K. Domingo", "L. Salazar"];
 const OCCUPATIONS = ["Vendor", "Driver", "Teacher", "Farmer", "Laborer", "Housekeeper", "Tricycle driver"];
-const STRUCTURES = ["Concrete", "Semi-concrete", "Wood", "Light materials"];
+// the same four words the BHW form offers, so the paper copy of a sample form ticks the right box
+const STRUCTURES = ["Concrete", "Semi-concrete", "Light/wooden", "Shanty"];
 const CONTAINER_TYPES = ["Jar", "Jug/pitcher", "Drum", "Tin can", "Flower vase", "Bottle", "Ant trap", "Others"];
 
 export function seedDatabase(db: Db, opts: SeedOptions): SeedSummary {

@@ -35,7 +35,9 @@ function checkRow(label, checked) {
 
 export function renderFormPaper({ details = {}, containers = [], houseNo, head, purok, barangay, stampLabel, stampTs }) {
   const d = details;
-  const structure = norm(d.buildingStructure);
+  // letters only, and older sample data said "Wood" or "Light materials" for what the form calls "Light/wooden"
+  const structure = norm(d.buildingStructure).replace(/[^a-z]/g, '');
+  const lightWood = structure.includes('wood') || structure.includes('light');
   const st = d.storeys;
   const single = st === 1 || norm(st) === 'single storey';
   const multi = (typeof st === 'number' && st >= 2) || norm(st) === '2 or more storeys';
@@ -116,11 +118,11 @@ export function renderFormPaper({ details = {}, containers = [], houseNo, head, 
         <div class="bhw-paper-checks">
           <div>
             ${checkRow('Concrete', structure === 'concrete')}
-            ${checkRow('Semi-Concrete', structure === 'semi-concrete')}
-            ${checkRow('Light/wooden', structure === 'light/wooden')}
+            ${checkRow('Semi-Concrete', structure === 'semiconcrete')}
+            ${checkRow('Light/wooden', lightWood)}
           </div>
           <div>
-            ${checkRow('Shanty', structure === 'shanty')}
+            ${checkRow('Shanty', structure.includes('shanty'))}
             ${checkRow('Single storey', single)}
             ${checkRow('2 or more storeys', multi)}
           </div>

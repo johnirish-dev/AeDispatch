@@ -43,7 +43,16 @@ try {
   fail(`Could not start the ranking: ${(err as Error).message}`);
 }
 
+// A prototype setting: with it on (the default) every phone that holds a barangay link also sees the household details
+// of that barangay's recent surveys, so a form recorded on one phone is complete on the others. The data here are
+// made up. Set SHARE_HOUSEHOLD_DETAILS=false before the system holds real households.
+const shareHouseholdDetails = !["false", "0", "no"].includes((process.env.SHARE_HOUSEHOLD_DETAILS ?? "").trim().toLowerCase());
+if (shareHouseholdDetails) {
+  console.warn("SHARE_HOUSEHOLD_DETAILS is on: anyone with a barangay link can see that barangay's household details. Set it to false for real data.");
+}
+
 const app = createApp({
+  shareHouseholdDetails,
   db,
   ranking,
   changes: new DataChanges(db, ranking),

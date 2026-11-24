@@ -61,7 +61,7 @@ export class Client {
   }
 }
 
-export async function startApi() {
+export async function startApi(options: { shareHouseholdDetails?: boolean } = {}) {
   const db = emptyDb();
   const summary = seedDatabase(db, { anchorDate: ANCHOR });
 
@@ -75,7 +75,7 @@ export async function startApi() {
   lines.length = 0;
 
   const sessions = new SessionManager("test-secret", clock);
-  const deps = { db, ranking, changes: new DataChanges(db, ranking), decisions: new Decisions(db, ranking), sessions };
+  const deps = { db, ranking, changes: new DataChanges(db, ranking), decisions: new Decisions(db, ranking), sessions, shareHouseholdDetails: options.shareHouseholdDetails };
   const server: Server = createApp(deps).listen(0);
   await new Promise((resolve) => server.once("listening", resolve));
   const baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;

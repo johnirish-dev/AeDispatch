@@ -141,7 +141,24 @@ export interface NewContainer {
   pupaeCount?: number;
 }
 
-/** What a BHW sees of the barangay's recent surveys: where, when, by whom and the container counts. Never a household's details. */
+/** A household's details, as filled in on the form. Only listed when the server is set to share them. */
+export interface HouseholdDetails {
+  headOfFamily: string | null;
+  age: number | null;
+  sex: string | null;
+  civilStatus: string | null;
+  occupation: string | null;
+  personsSlept: number | null;
+  buildingStructure: string | null;
+  storeys: number | null;
+  rooms: number | null;
+  screened: boolean | null;
+}
+
+/**
+ * What a BHW sees of the barangay's recent surveys: where, when, by whom and the container counts. A household's
+ * details (`household`) are there only when the server is set to share them.
+ */
 export interface BhwSurveyRow {
   id: number;
   clientSubmissionId: string | null;
@@ -154,6 +171,7 @@ export interface BhwSurveyRow {
   /** The name typed on the form (or the registered worker's name for older rows). */
   interviewer: string | null;
   noContainersFound: boolean;
+  household?: HouseholdDetails;
   containers: {
     location: "indoor" | "outdoor" | "natural";
     containerType: string;
@@ -168,16 +186,22 @@ export interface BhwSurveyRow {
 
 /**
  * The surveys of one barangay with a survey date on or after `sinceDate`, newest submission first, at most `limit`.
- * The head of the family, age, sex, civil status, occupation and the building details are NOT selected: the barangay
- * link is shared, so this list must stay free of personal details.
+ * The head of the family, age, sex, civil status, occupation and the building details are only selected when
+ * `withHousehold` is true (the server is set to share them): the barangay link is shared, so by default this list
+ * stays free of personal details.
  */
-export function listRecentSurveysOfBarangay(db: Db, barangayId: number, sinceDate: string, limit: number): BhwSurveyRow[] {
+export function listRecentSurveysOfBarangay(db: Db, barangayId: number, sinceDate: string, limit: number, withHousehold = false): BhwSurveyRow[] {
+  const household = withHousehold
+    ? `, s.head_of_family AS headOfFamily, s.age AS age, s.sex AS sex, s.civil_status AS civilStatus, s.occupation AS occupation,
+        s.persons_slept AS personsSlept, s.building_structure AS buildingStructure, s.storeys AS storeys, s.rooms AS rooms,
+        s.screened AS screened`
+    : "";
   const rows = db
     .prepare(
       `SELECT s.id, s.client_submission_id AS clientSubmissionId, s.task_id AS taskId, s.survey_date AS surveyDate,
               s.submitted_at AS submittedAt, s.house_no AS houseNo, s.purok_id AS purokId, p.name AS purokName,
               COALESCE(s.surveyed_by, h.display_name) AS interviewer,
-              s.no_containers_found AS noContainersFound
+              s.no_containers_found AS noContainersFound${household}
        FROM entomological_survey s
        LEFT JOIN purok p ON p.id = s.purok_id
        LEFT JOIN bhw h ON h.id = s.bhw_id
@@ -185,7 +209,7 @@ export function listRecentSurveysOfBarangay(db: Db, barangayId: number, sinceDat
        ORDER BY s.submitted_at DESC, s.id DESC
        LIMIT ?`,
     )
-    .all(barangayId, sinceDate, limit) as (Omit<BhwSurveyRow, "noContainersFound" | "containers"> & { noContainersFound: number })[];
+    .all(barangayId, sinceDate, limit) as (Omit<BhwSurveyRow, "noContainersFound" | "containers" | "household"> & { noContainersFound: number } & Partial<Omit<HouseholdDetails, "screened">> & { screened?: number | null })[];
   if (rows.length === 0) return [];
 
   const byId = new Map<number, BhwSurveyRow["containers"]>();
@@ -199,7 +223,25 @@ export function listRecentSurveysOfBarangay(db: Db, barangayId: number, sinceDat
     .all(...rows.map((r) => r.id)) as (BhwSurveyRow["containers"][number] & { surveyId: number })[];
   for (const { surveyId, ...c } of containers) byId.set(surveyId, [...(byId.get(surveyId) ?? []), c]);
 
-  return rows.map((r) => ({ ...r, noContainersFound: r.noContainersFound === 1, containers: byId.get(r.id) ?? [] }));
+  return rows.map((r) => {
+    const { headOfFamily, age, sex, civilStatus, occupation, personsSlept, buildingStructure, storeys, rooms, screened, ...rest } = r;
+    const row: BhwSurveyRow = { ...rest, noContainersFound: r.noContainersFound === 1, containers: byId.get(r.id) ?? [] };
+    if (withHousehold) {
+      row.household = {
+        headOfFamily: headOfFamily ?? null,
+        age: age ?? null,
+        sex: sex ?? null,
+        civilStatus: civilStatus ?? null,
+        occupation: occupation ?? null,
+        personsSlept: personsSlept ?? null,
+        buildingStructure: buildingStructure ?? null,
+        storeys: storeys ?? null,
+        rooms: rooms ?? null,
+        screened: screened === null || screened === undefined ? null : screened === 1,
+      };
+    }
+    return row;
+  });
 }
 
 /** The survey already saved under this submission id in this barangay, if any. */

@@ -57,24 +57,31 @@ async function init() {
   }
 
   setBearerToken(token);
-  initAutoSync();
 
+  // The saved forms are kept per barangay, so the barangay of this link must be known before anything is read or
+  // synced: from the server, or (offline) from what this phone remembered about this link.
   try {
     const me = await get('/api/bhw/me');
+    Store.rememberToken(token, me.barangay.id);
+    Store.useBarangay(me.barangay.id);
     Store.setContext(me);
     applyContext(me);
+    initAutoSync();
     initRouter(appRoot);
   } catch (err) {
     if (err.status === 401) {
       appRoot.innerHTML = '<div style="padding: 20px;">This link is not valid. Ask the health office for a new one.</div>';
       Store.setToken(null);
     } else {
-      const cached = Store.getContext();
+      const known = Store.barangayOfToken(token);
+      if (known !== null) Store.useBarangay(known);
+      const cached = known === null ? null : Store.getContext();
       if (!cached) {
         appRoot.innerHTML = '<div style="padding: 20px;">Connect once to load this BHW workspace for offline use.</div>';
         return;
       }
       applyContext(cached);
+      initAutoSync();
       initRouter(appRoot);
     }
   }

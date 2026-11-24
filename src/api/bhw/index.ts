@@ -12,7 +12,7 @@ import type { AppDeps } from "../deps";
 export const BHW_LIST_DAYS = 30;
 export const BHW_LIST_MAX = 200;
 
-export function bhwRoutes({ db, changes, ranking }: AppDeps): Router {
+export function bhwRoutes({ db, changes, ranking, shareHouseholdDetails }: AppDeps): Router {
   const router = Router();
 
   router.get("/me", (req, res) => {
@@ -28,10 +28,10 @@ export function bhwRoutes({ db, changes, ranking }: AppDeps): Router {
   });
 
   // The barangay's recent surveys, so every phone that holds the barangay link sees the same list. Container counts and
-  // who did the interview, but never a household's details (see listRecentSurveysOfBarangay).
+  // who did the interview; a household's details only when the server is set to share them (see listRecentSurveysOfBarangay).
   router.get("/surveys", (req, res) => {
     const since = addDays(formatDate(ranking.now()), -BHW_LIST_DAYS);
-    res.json(listRecentSurveysOfBarangay(db, req.bhwBarangayId!, since, BHW_LIST_MAX));
+    res.json(listRecentSurveysOfBarangay(db, req.bhwBarangayId!, since, BHW_LIST_MAX, shareHouseholdDetails === true));
   });
 
   router.post("/surveys", (req, res) => {

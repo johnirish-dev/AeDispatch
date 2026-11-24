@@ -823,6 +823,51 @@ describe("the BHW's list of recent surveys", () => {
     }
   });
 
+  it("carries the household's details only when the server is set to share them", async () => {
+    const details = { personsSlept: 5, buildingStructure: "Concrete", storeys: 2, rooms: 3, screened: true };
+    const on = await startApi({ shareHouseholdDetails: true });
+    try {
+      const { phone, me } = await open(on, "Mabini");
+      const sent = await phone.post("/api/bhw/surveys", payload(me.puroks[0].id, details));
+      const row = (await list(phone)).find((r) => r.id === sent.body.surveyId) as unknown as { household: Record<string, unknown> } & Record<string, unknown>;
+      expect(row.household).toEqual({
+        headOfFamily: "Private Name",
+        age: 38,
+        sex: "Male",
+        civilStatus: "Married",
+        occupation: "Secret Job",
+        personsSlept: 5,
+        buildingStructure: "Concrete",
+        storeys: 2,
+        rooms: 3,
+        screened: true,
+      });
+      // the rest of the row is exactly what it is with sharing off, plus the one `household` object
+      expect(Object.keys(row).sort()).toEqual(["clientSubmissionId", "containers", "houseNo", "household", "id", "interviewer", "noContainersFound", "purokId", "purokName", "submittedAt", "surveyDate", "taskId"]);
+      // another barangay's phone does not get this household
+      const other = await open(on, "Peñafrancia");
+      expect(JSON.stringify(await list(other.phone))).not.toContain("Private Name");
+      // the seeded surveys of the barangay carry their details too
+      const seeded = (await list(phone)).filter((r) => r.id !== sent.body.surveyId) as unknown as { household?: { headOfFamily: string | null } }[];
+      expect(seeded.length).toBeGreaterThan(0);
+      expect(seeded.every((r) => typeof r.household?.headOfFamily === "string")).toBe(true);
+    } finally {
+      await on.close();
+    }
+    const off = await startApi({ shareHouseholdDetails: false });
+    try {
+      const { phone, me } = await open(off, "Mabini");
+      const sent = await phone.post("/api/bhw/surveys", payload(me.puroks[0].id, details));
+      const rows = await list(phone);
+      expect(rows.length).toBeGreaterThan(0);
+      expect(rows.every((r) => !("household" in r))).toBe(true);
+      expect(JSON.stringify(rows)).not.toContain("Private Name");
+      expect(sent.status).toBe(201);
+    } finally {
+      await off.close();
+    }
+  });
+
   it("is the same on a second phone with the same link, and only holds this barangay's surveys", async () => {
     const api = await startApi();
     try {

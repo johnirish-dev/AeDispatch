@@ -11,4 +11,9 @@ export interface AppDeps {
   changes: DataChanges;
   decisions: Decisions;
   sessions: SessionManager;
+  /**
+   * Whether the BHW survey list also carries each household's details (head of the family, age, building and so on).
+   * Off unless the server turns it on: the barangay link is shared, so with real data it should stay off.
+   */
+  shareHouseholdDetails?: boolean;
 }

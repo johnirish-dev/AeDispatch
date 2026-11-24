@@ -82,6 +82,7 @@ For a production-style run: `npm run build`, then `npm start`.
 | `WEATHER_API_KEY` | Optional. If empty, the stored weather data are used |
 | `DB_PATH` | Optional. Database file (default `aedispatch.db`) |
 | `SEED_DATE` | Optional. The "today" used by `npm run seed` |
+| `SHARE_HOUSEHOLD_DETAILS` | Optional, `true` by default. Lets every phone that holds a barangay link see the household details (head of the family, age, building) of that barangay's recent surveys, so sample forms are complete on any phone. All the data here are made up; set `false` before real households are entered, and the list then carries only counts |
 
 `.env` is not in git, so it must be created again on another computer.
 

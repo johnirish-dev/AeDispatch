@@ -147,7 +147,7 @@ export async function renderMyForms(root, initialFilter) {
         <button id="btn-back-forms" type="button" class="bhw-back-link">${icon('chevronLeft', 14, 2)} Back to My forms</button>
       </div>
 
-      ${d.fromServer ? `<p style="font-size:13px; color:#6B7280; margin:0 0 12px;">This form was recorded on another phone. Only the container counts are shown here; the household details stay on the phone that recorded it.</p>` : ''}
+      ${d.fromServer && !d.householdShared ? `<p style="font-size:13px; color:#6B7280; margin:0 0 12px;">This form was recorded on another phone. Only the container counts are shown here; the household details stay on the phone that recorded it.</p>` : ''}
 
       <section class="bhw-panel bhw-form-detail-panel">
         ${renderResultCard({ totals, meta: `House ${item.houseNo || '—'} · ${item.purok}` })}
@@ -169,7 +169,7 @@ export async function renderMyForms(root, initialFilter) {
                   details: d,
                   containers: validConts,
                   houseNo: item.houseNo,
-                  head: item.head,
+                  head: d.fromServer && !d.householdShared ? '' : item.head, // no name to print when the server did not share it
                   purok: item.purok,
                   barangay: me?.barangay?.name,
                   stampLabel: item.kind === 'draft' ? 'Saved as draft' : item.needsReview ? 'Needs attention' : item.kind === 'pending' ? 'Queued' : 'Submitted',
