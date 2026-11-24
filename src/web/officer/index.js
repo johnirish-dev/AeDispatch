@@ -14,11 +14,11 @@ import { actionCell, decisionHref, riskBadge, scoreCell, taskIcon } from "./part
 
 const t = strings.officer.overview;
 const QUEUE_HREF = "/officer/queue.html";
-// How many barangays the "Top priority" card lists depends on how tall the window is, so the card is neither stretched
-// nor left empty: three on a short laptop window, more on a tall screen (or when the browser is zoomed out).
-const focusMax = () => Math.min(8, Math.max(3, Math.floor((window.innerHeight - 380) / 88)));
-const assignmentsMax = () => Math.max(5, Math.floor(focusMax() * 1.7));
-const shownNow = { focus: 0 };
+// The "Top priority" card always lists three barangays, however big the window is: the rows grow to fill the card.
+// The assignments list beside it still lists more on a taller window.
+const focusMax = () => 3;
+const assignmentsMax = () => Math.max(5, Math.floor(Math.min(8, Math.max(3, Math.floor((window.innerHeight - 380) / 88))) * 1.7));
+const shownNow = { focus: 0, assign: 0 };
 const data = { barangays: null, assignments: null };
 
 const els = {};
@@ -119,7 +119,7 @@ function focusItem(b) {
     h(
       "div",
       { class: "focus__name" },
-      h("span", { class: "focus__title" }, h("a", { class: "row-link", href: decisionHref(b, "dashboard") }, b.name), b.tier2.unlocked ? h("span", { class: "focus__tier2" }, strings.officer.queue.tier2Badge) : null),
+      h("span", { class: "focus__title" }, h("a", { class: "row-link", href: decisionHref(b, "dashboard") }, b.name), b.tier2.unlocked ? h("span", { class: "focus__tier2", title: strings.officer.queue.tier2Badge, "aria-label": strings.officer.queue.tier2Badge }, t.tier2Short) : null),
     ),
     h("div", { class: "focus__score" }, scoreCell(b)),
     h("div", { class: "focus__risk" }, riskBadge(b)),
@@ -204,6 +204,7 @@ function renderAssignments(list) {
     return;
   }
   data.assignments = list;
+  shownNow.assign = assignmentsMax();
   const items = list.slice(0, assignmentsMax()).map((a) => {
     const status = fmt.statusBadge(a.status);
     return h(
@@ -255,7 +256,7 @@ let resizeTimer = null;
 window.addEventListener("resize", () => {
   window.clearTimeout(resizeTimer);
   resizeTimer = window.setTimeout(() => {
-    if (focusMax() === shownNow.focus) return;
+    if (assignmentsMax() === shownNow.assign) return;
     if (data.barangays) renderFocus(data.barangays);
     if (data.assignments) renderAssignments(data.assignments);
   }, 200);

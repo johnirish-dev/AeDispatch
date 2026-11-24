@@ -54,6 +54,7 @@ export const strings = {
     },
 
     overview: {
+      tier2Short: "Tier 2 review",
       title: "Dashboard",
       dateLabel: "Today’s date and time, Philippine time",
       stats: {
@@ -149,20 +150,11 @@ export const strings = {
 
       weather: {
         title: "Weather simulator",
-        sub: "Replaces the imported weather and re-scores every barangay, so the ranking can be shown changing.",
+        sub: "Pick a preset to replace the weather and re-score every barangay, so the ranking can be shown changing.",
         usingStored: "Using the imported weather",
         usingSimulated: "Simulated weather is in use",
         presetsLabel: "Presets",
-        customLabel: "Your own values",
-        temp: "Temperature (°C, every day)",
-        tempHelp: "From 10 to 45",
-        rain: "Rain (mm, every day)",
-        rainHelp: "From 0 to 1,500",
-        apply: "Apply values",
-        reset: "Reset to imported data",
-        applying: "Applying…",
         applied: "Weather applied. Every barangay was re-scored.",
-        resetDone: "Back to the imported weather. Every barangay was re-scored.",
         seeQueue: "See the priority queue",
         daysTitle: "The last days used for scoring",
         date: "Date",
@@ -170,12 +162,11 @@ export const strings = {
         rainCol: "Rain (mm)",
         source: "Source",
         sources: { file: "Imported file", api: "Weather service", simulated: "Simulated" },
-        invalid: "Enter a temperature from 10 to 45 and rain from 0 to 1,500.",
       },
 
       weights: {
         title: "Signal weights",
-        sub: "Move a slider to see how the ranking would change. Nothing changes until you save a version and activate it.",
+        sub: "Move a slider to see how the ranking would change. Nothing changes until you press Apply weights.",
         names: { weather: "Weather", household: "Household reports", symptom: "Symptom checks", field: "Field surveys", cases: "Hospital cases" },
         total: "Always adds up to 100%",
         reset: "Back to the weights in use",
@@ -191,19 +182,9 @@ export const strings = {
         up: (n) => `up ${n}`,
         down: (n) => `down ${n}`,
         noChange: "These are the weights in use now.",
-        note: "Note for this version (optional)",
-        notePlaceholder: "For example: hospital cases left out",
-        save: "Save as new version",
-        saving: "Saving…",
-        saved: (v) => `Saved as version ${v}. It is not in use until you activate it.`,
-        versionsTitle: "Versions",
-        version: "Version",
-        noteCol: "Note",
-        inUse: "In use",
-        activate: "Activate",
-        activating: "Activating…",
-        activated: (v) => `Version ${v} is now in use. Every barangay was re-scored.`,
-        savedAt: "Saved",
+        apply: "Apply weights",
+        applying: "Applying…",
+        applied: "The new weights are in use. Every barangay was re-scored.",
       },
 
       results: {
@@ -341,24 +322,23 @@ export const strings = {
     trends: {
       title: "Trends",
       loadError: "The trends could not be loaded.",
+      tabsLabel: "Trend charts",
+      tabs: { risk: "Risk levels", cases: "Cases", weather: "Weather", resident: "Resident reports", containers: "Positive containers" },
       casesTitle: "Confirmed cases",
       casesSeries: "Confirmed cases",
       casesChartTitle: "Confirmed cases per week, all barangays",
       casesChartDesc: "Line chart of confirmed dengue cases for each of the last eight weeks.",
-      casesCaption: (latest, before, week) =>
-        latest === before ? `${latest} confirmed cases in ${week}, the same as the week before.` : `${latest} confirmed cases in ${week}, ${latest > before ? "up" : "down"} from ${before} the week before.`,
       riskTitle: "Barangays by risk level",
       riskChartTitle: "Number of barangays at each risk level per week",
-      riskChartDesc: "Four small line charts on the same scale: how many barangays were High, Elevated, Moderate or Low in each of the last eight weeks.",
-      riskCaption: (now, before) =>
-        now === before
-          ? `${now} barangays are Elevated or High, the same as the week before.`
-          : `${now} barangays are Elevated or High, ${now > before ? "up" : "down"} from ${before} the week before.`,
-      signalsTitle: "Signals behind the score",
-      signalsSub: "One chart for each data source, all barangays together, each on its own scale.",
-      partialNote: "The dashed part is the week that is not over yet.",
-      signalsChartTitle: "Weekly figures for each data source",
-      signalsChartDesc: "Small line charts of rain, temperature, household reports, symptom checks with warning signs, and the share of inspected containers with larvae, for each of the last eight weeks.",
+      riskChartDesc: "Line chart with four lines: how many barangays were High, Elevated, Moderate or Low in each of the last eight weeks.",
+      weatherTitle: "Rain and temperature",
+      weatherChartTitle: "Weekly rain and temperature",
+      weatherChartDesc: "Line chart with two lines: rain in millimetres (left scale) and mean temperature in degrees (right scale) for each of the last eight weeks.",
+      residentTitle: "Resident reports",
+      residentChartTitle: "Household reports and warning-sign checks per week",
+      residentChartDesc: "Line chart with two lines: how many household reports and how many symptom checks with warning signs residents sent in each of the last eight weeks.",
+      signalChartTitle: "weekly figure, all barangays together",
+      signalChartDesc: "Line chart of the weekly figure for each of the last eight weeks.",
       signals: {
         rain: { name: "Rain", unit: "mm" },
         temp: { name: "Temperature", unit: "°C" },

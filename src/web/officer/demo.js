@@ -93,8 +93,8 @@ async function loadPhones() {
       h(
         "div",
         { class: "qr-grid" },
-        qrCard(t.phones.resident, t.phones.residentSub, links.resident),
-        h("div", { class: "qr-col" }, h("label", { class: "field" }, h("span", { class: "field__label" }, t.phones.pickBarangay), select), bhwSlot),
+        h("div", { class: "qr-col" }, qrCard(t.phones.resident, t.phones.residentSub, links.resident)),
+        h("div", { class: "qr-col" }, bhwSlot, h("label", { class: "field" }, h("span", { class: "field__label" }, t.phones.pickBarangay), select)),
       ),
     );
   } catch (err) {
@@ -109,15 +109,6 @@ function drawWeather(state) {
   const buttons = state.presets.map((p) =>
     h("button", { class: "btn", type: "button", onclick: () => apply({ preset: p.key }, w.applied) }, p.label),
   );
-  const temp = h("input", { class: "input", id: "wx-temp", type: "number", min: "10", max: "45", step: "0.5", value: "29" });
-  const rain = h("input", { class: "input", id: "wx-rain", type: "number", min: "0", max: "1500", step: "1", value: "10" });
-  const custom = () => {
-    const tempC = Number(temp.value);
-    const rainMm = Number(rain.value);
-    if (temp.value === "" || rain.value === "" || tempC < 10 || tempC > 45 || rainMm < 0 || rainMm > 1500) return notice(els.weatherMsg, w.invalid, "error");
-    apply({ tempC, rainMm }, w.applied);
-  };
-  const reset = h("button", { class: "btn btn--primary", type: "button", disabled: !state.simulated, onclick: () => run(post("/api/officer/demo/weather/reset"), w.resetDone) }, w.reset);
 
   const rows = state.days.map((d) =>
     h("tr", {}, h("th", { scope: "row" }, fmt.plainDate(d.date)), h("td", { class: "num" }, d.tempC.toFixed(1)), h("td", { class: "num" }, d.rainMm.toFixed(1)), h("td", {}, d.source === "simulated" ? h("span", { class: "badge badge--solid" }, t.simulatedBadge) : (w.sources[d.source] ?? d.source))),
@@ -125,13 +116,6 @@ function drawWeather(state) {
   clear(els.weather).append(
     h("p", { class: "weather__state" }, state.simulated ? h("span", { class: "badge badge--solid" }, t.simulatedBadge) : null, " ", state.simulated ? w.usingSimulated : w.usingStored),
     h("div", { class: "form-block" }, h("h3", {}, w.presetsLabel), h("div", { class: "row" }, ...buttons)),
-    h(
-      "div",
-      { class: "form-block" },
-      h("h3", {}, w.customLabel),
-      h("div", { class: "form-row" }, h("label", { class: "field" }, h("span", { class: "field__label" }, w.temp), temp, h("span", { class: "field__help" }, w.tempHelp)), h("label", { class: "field" }, h("span", { class: "field__label" }, w.rain), rain, h("span", { class: "field__help" }, w.rainHelp))),
-      h("div", { class: "row" }, h("button", { class: "btn", type: "button", onclick: custom }, w.apply), reset),
-    ),
     h("div", { class: "weather__msg", ref: null }, ""),
     h("a", { class: "btn btn--link", href: "/officer/queue.html" }, w.seeQueue),
     h("h3", {}, w.daysTitle),
@@ -234,48 +218,20 @@ async function loadPreview() {
   }
 }
 
-function drawVersions(data) {
-  const w = t.weights;
-  const rows = [...data.versions].reverse().map((v) =>
-    h(
-      "tr",
-      {},
-      h("th", { scope: "row" }, `v${v.version}`),
-      h("td", {}, v.note ?? "—"),
-      h("td", {}, WEIGHT_KEYS.map((k) => `${w.names[k].split(" ")[0]} ${pct(v.weights[k])}`).join(" · ")),
-      h("td", {}, v.isActive ? h("span", { class: "badge badge--solid" }, w.inUse) : h("button", { class: "btn btn--sm", type: "button", onclick: (e) => activate(v.version, e.currentTarget) }, w.activate)),
-    ),
-  );
-  clear(els.versions).append(h("h3", {}, w.versionsTitle), h("div", { class: "table-wrap" }, h("table", { class: "table" }, h("thead", {}, h("tr", {}, h("th", {}, w.version), h("th", {}, w.noteCol), h("th", {}, w.title), h("th", {}, ""))), h("tbody", {}, ...rows))));
-}
-
-async function activate(version, button) {
+async function apply_weights(button) {
   button.disabled = true;
-  button.textContent = t.weights.activating;
+  button.textContent = t.weights.applying;
   try {
-    await post(`/api/officer/demo/parameters/${version}/activate`);
+    // A version is still recorded behind the scenes; it is made the one in use straight away.
+    const saved = await post("/api/officer/demo/parameters", { weights, note: null });
+    await post(`/api/officer/demo/parameters/${saved.version}/activate`);
     await loadWeights();
-    notice(els.weightsMsg, t.weights.activated(version));
-  } catch (err) {
-    button.disabled = false;
-    button.textContent = t.weights.activate;
-    notice(els.weightsMsg, err.message || t.loadError, "error");
-  }
-}
-
-async function save(button, note) {
-  button.disabled = true;
-  button.textContent = t.weights.saving;
-  try {
-    const saved = await post("/api/officer/demo/parameters", { weights, note: note.value });
-    note.value = "";
-    drawVersions(await get("/api/officer/demo/parameters"));
-    notice(els.weightsMsg, t.weights.saved(saved.version));
+    notice(els.weightsMsg, t.weights.applied);
   } catch (err) {
     notice(els.weightsMsg, err.message || t.loadError, "error");
   } finally {
     button.disabled = false;
-    button.textContent = t.weights.save;
+    button.textContent = t.weights.apply;
   }
 }
 
@@ -284,21 +240,16 @@ async function loadWeights() {
     const data = await get("/api/officer/demo/parameters");
     active = data.active;
     weights = { ...active.weights };
-    const note = h("input", { class: "input", id: "w-note", type: "text", maxlength: "200", placeholder: t.weights.notePlaceholder });
-    const saveBtn = h("button", { class: "btn btn--primary", type: "button", onclick: () => save(saveBtn, note) }, t.weights.save);
+    const applyBtn = h("button", { class: "btn btn--primary", type: "button", onclick: () => apply_weights(applyBtn) }, t.weights.apply);
     els.weightsMsg = h("div", {});
     clear(els.weights).append(
       h("p", { class: "weights__total" }, t.weights.total),
       (els.sliders = h("div", { class: "weights" })),
-      h("div", { class: "row" }, h("button", { class: "btn btn--sm", type: "button", onclick: () => { weights = { ...active.weights }; drawSliders(); schedulePreview(); } }, t.weights.reset)),
-      h("label", { class: "field" }, h("span", { class: "field__label" }, t.weights.note), note),
-      h("div", { class: "row" }, saveBtn),
+      h("div", { class: "row" }, applyBtn, h("button", { class: "btn", type: "button", onclick: () => { weights = { ...active.weights }; drawSliders(); schedulePreview(); } }, t.weights.reset)),
       els.weightsMsg,
       (els.preview = h("div", { class: "preview" })),
-      (els.versions = h("div", { class: "versions" })),
     );
     drawSliders();
-    drawVersions(data);
     loadPreview();
   } catch (err) {
     fail(els.weights, err, loadWeights);

@@ -63,12 +63,13 @@ const shown = (v, unit) => (v === null || v === undefined ? "No data" : `${v}${u
  * One panel: a holder whose svg is drawn again whenever its width changes. `group` is the
  * object that owns the tooltip and the chosen week; the panel only reports what happened.
  */
-function buildPanel({ labels, item, title, desc, scale, wide, id, group, partialLast }) {
-  const H = wide ? 250 : 150;
+function buildPanel({ labels, item, title, desc, scale, wide, id, group, partialLast, fill }) {
+  let H = wide ? 250 : 150;
   const holder = h("div", { class: "chart__plot" });
   const panel = { holder, item, svg: null, W: 0, xAt: () => 0, show: () => {} };
 
-  function render(W) {
+  function render(W, measuredH) {
+    if (fill && measuredH) H = measuredH;
     const pad = { left: 34, right: wide ? 22 : 14, top: wide ? 26 : 14, bottom: 28 };
     const n = labels.length;
     const plotW = W - pad.left - pad.right;
@@ -170,6 +171,7 @@ function buildPanel({ labels, item, title, desc, scale, wide, id, group, partial
 
     panel.svg = svg;
     panel.W = W;
+    panel.H = H;
     panel.xAt = x;
     panel.show = (i) => {
       const layer = [band, cross, ring];
@@ -204,13 +206,14 @@ function buildPanel({ labels, item, title, desc, scale, wide, id, group, partial
   if (typeof ResizeObserver === "function") {
     new ResizeObserver((entries) => {
       const width = Math.round(entries[0].contentRect.width);
-      if (width >= 120 && Math.abs(width - panel.W) > 3) render(width);
+      const height = Math.round(entries[0].contentRect.height);
+      if (width >= 120 && (Math.abs(width - panel.W) > 3 || (fill && height >= 160 && Math.abs(height - panel.H) > 3))) render(width, height);
     }).observe(holder);
   }
   return panel;
 }
 
-function hiddenTable(caption, labels, columns) {
+export function hiddenTable(caption, labels, columns) {
   return h(
     "table",
     { class: "sr-only" },
@@ -224,11 +227,11 @@ function hiddenTable(caption, labels, columns) {
  * `series` is a list of { name, color, values, unit?, zeroBased? }. One series gives one wide chart; several
  * give a row of small charts. `title` and `desc` name the whole chart for screen readers.
  */
-export function lineChart({ labels, series, title, desc, shared = true, partialLast = false }) {
+export function lineChart({ labels, series, title, desc, shared = true, partialLast = false, fill = false }) {
   const id = `chart-${++chartCount}`;
   const wide = series.length === 1;
   const everyValue = series.flatMap((item) => item.values);
-  const sharedScale = shared || wide ? niceScale(everyValue, 4, true) : null;
+  const sharedScale = shared || wide ? niceScale(everyValue, 4, !wide || series[0].zeroBased !== false) : null; // a lone chart may start above zero (temperature)
   const root = h("div", { class: "chart" });
   const tip = h("div", { class: "chart__tip", role: "presentation", hidden: true });
   const last = labels.length - 1;
@@ -278,6 +281,7 @@ export function lineChart({ labels, series, title, desc, shared = true, partialL
       id: `${id}-${k}`,
       group,
       partialLast,
+      fill: fill && wide,
     }),
   );
   document.addEventListener("pointerdown", (event) => {

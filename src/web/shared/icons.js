@@ -6,11 +6,11 @@ import { s } from "./dom.js";
 
 const PATHS = {
   overview: ["M4 5h7v7H4z", "M13 5h7v4h-7z", "M13 11h7v8h-7z", "M4 14h7v5H4z"],
-  queue: ["M4 6h10", "M4 12h16", "M4 18h7", "M17 4v5", "M15 7l2 2 2-2"],
+  queue: ["M9 20V8h6v12", "M3 20v-6h6", "M15 20v-4h6", "M3 20h18", "M12 3.5v1.5"], // a podium: who ranks first
   import: ["M12 15V4", "M8 8l4-4 4 4", "M5 15v4h14v-4"],
   profiles: ["M12 21s-6-5.2-6-10a6 6 0 0112 0c0 4.8-6 10-6 10z", "M12 8.5a2.5 2.5 0 100 5 2.5 2.5 0 000-5z"],
   trends: ["M4 19V5", "M4 19h16", "M8 15l3-4 3 2 4-6"],
-  activity: ["M9 6h11", "M9 12h11", "M9 18h11", "M4 6h.01", "M4 12h.01", "M4 18h.01"],
+  activity: ["M3 12h4l2.5-7 5 14 2.5-7h4"], // a pulse line
   demo: ["M5 7h9", "M18 7h1", "M5 17h1", "M10 17h9", "M16 5v4", "M8 15v4"],
   search: ["M11 4a7 7 0 100 14 7 7 0 000-14z", "M20 20l-4-4"],
   up: ["M7 17L17 7", "M9 7h8v8"],

@@ -346,6 +346,15 @@
 }
 /* the week band, hairline and ring glide from one week to the next */
 .chart__hover { transition: transform 0.16s var(--ease-out); }
+/* the legend of a chart with several lines: one button per line, the pressed one is highlighted in the chart */
+.legend { display: flex; flex-wrap: wrap; gap: var(--s-2); margin: var(--s-3) 0 var(--s-2); }
+.legend__btn { display: inline-flex; align-items: center; gap: var(--s-2); min-height: 36px; padding: 0 var(--s-4); border: 1px solid var(--line); border-radius: var(--r-pill); background: var(--surface); color: var(--ink); font: inherit; font-size: var(--fs-sm); cursor: pointer; transition: background-color 0.15s var(--ease-out), border-color 0.15s var(--ease-out); }
+.legend__btn strong { font-variant-numeric: tabular-nums; font-weight: 700; }
+.legend__btn .chart__key { margin-right: 0; }
+@media (hover: hover) and (pointer: fine) {
+  .legend__btn:hover { background: var(--header-row); }
+}
+.legend__btn.is-on { border-color: var(--brand-dark); background: var(--accent-tint); }
 .chart__key { display: inline-block; width: 14px; height: 3px; margin-right: var(--s-2); border-radius: 2px; vertical-align: middle; }
 .chart__tip { position: absolute; z-index: 5; min-width: 130px; padding: var(--s-2) var(--s-3); border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface); box-shadow: 0 4px 16px rgba(16, 20, 18, 0.1); pointer-events: none; }
 .chart__tip-head { margin-bottom: var(--s-1); color: var(--muted); font-size: var(--fs-xs); }

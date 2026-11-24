@@ -120,7 +120,7 @@ function buildEvidence() {
                   "tr",
                   { class: hot.has(p.purok) ? "is-hot" : null },
                   h("th", { scope: "row" }, p.purok),
-                  h("td", {}, String(p.cases), hot.has(p.purok) ? h("span", { class: "badge badge--sm" }, t.qualifies(min)) : null),
+                  h("td", {}, hot.has(p.purok) ? h("span", { class: "case-hot" }, String(p.cases)) : String(p.cases), hot.has(p.purok) ? h("span", { class: "badge badge--sm" }, t.qualifies(min)) : null),
                 ),
               ),
             ),
