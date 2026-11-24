@@ -85,7 +85,8 @@ export function listTasksForBarangay(db: Db, barangayId: number) {
   const rows = db
     .prepare(
       `SELECT id, recommendation_id AS recommendationId, barangay_id AS barangayId, type, puroks, status,
-              created_at AS createdAt
+              created_at AS createdAt,
+              (SELECT COUNT(*) FROM entomological_survey s WHERE s.task_id = field_task.id) AS households
        FROM field_task WHERE barangay_id = ? ORDER BY id DESC`,
     )
     .all(barangayId) as {
@@ -96,6 +97,8 @@ export function listTasksForBarangay(db: Db, barangayId: number) {
     puroks: string;
     status: TaskStatus;
     createdAt: string;
+    /** How many household surveys were submitted for this task. */
+    households: number;
   }[];
   return rows.map((r) => ({ ...r, puroks: JSON.parse(r.puroks) as string[] }));
 }
@@ -444,7 +447,7 @@ export interface FindingFilters {
 export function listFindings(db: Db, f: FindingFilters = {}) {
   return db
     .prepare(
-      `SELECT s.id, s.barangay_id AS barangayId, b.name AS barangayName, s.purok_id AS purokId,
+      `SELECT s.id, s.task_id AS taskId, s.barangay_id AS barangayId, b.name AS barangayName, s.purok_id AS purokId,
               p.name AS purokName, s.house_no AS houseNo, s.survey_date AS surveyDate,
               s.submitted_at AS submittedAt,
               COALESCE(SUM(c.total), 0) AS containers, COALESCE(SUM(c.positive), 0) AS positive
@@ -466,6 +469,8 @@ export function listFindings(db: Db, f: FindingFilters = {}) {
       limit: f.limit ?? 200,
     }) as {
     id: number;
+    /** The assignment this survey was done for; null when a BHW started it without one. */
+    taskId: number | null;
     barangayId: number;
     barangayName: string;
     purokId: number | null;

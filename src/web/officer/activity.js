@@ -80,6 +80,7 @@ function failure(err, message, retry) {
 async function renderHome(token) {
   const body = h("div", { style: "margin-top: var(--s-4)" }, loading());
   els.view.append(h("section", { class: "card", "aria-labelledby": "assign-title" }, heading(t.assignmentsTitle, "assign-title"), body));
+  renderUnassigned(token);
   try {
     const list = await get("/api/officer/assignments");
     if (token !== renderToken) return;
@@ -123,6 +124,49 @@ async function renderHome(token) {
   }
 }
 
+/** The barangays that have surveys with no assignment behind them (a BHW can start a survey without a task), each with a link to its findings. */
+async function renderUnassigned(token) {
+  try {
+    const loose = (await ensureFindings()).filter((f) => f.taskId === null || f.taskId === undefined);
+    if (token !== renderToken || loose.length === 0) return;
+    const rows = barangaySummaries(loose);
+    const u = t.unassigned;
+    els.view.append(
+      h(
+        "section",
+        { class: "card", "aria-labelledby": "loose-title" },
+        heading(u.title, "loose-title"),
+        h("p", { class: "card__sub" }, u.note),
+        h(
+          "div",
+          { class: "table-wrap", style: "margin-top: var(--s-3)" },
+          h(
+            "table",
+            { class: "table table--activity" },
+            h("caption", { class: "sr-only" }, u.title),
+            h("thead", {}, h("tr", {}, h("th", { scope: "col" }, t.columns.barangay), h("th", { scope: "col" }, t.columns.households), h("th", { scope: "col" }, u.last))),
+            h(
+              "tbody",
+              {},
+              ...rows.map((b) =>
+                h(
+                  "tr",
+                  {},
+                  h("th", { scope: "row", class: "c-name" }, h("a", { class: "row-link", href: `#findings/${b.id}`, "aria-label": u.open(b.name) }, b.name)),
+                  h("td", { class: "c-house", "data-label": t.columns.households }, String(b.households)),
+                  h("td", { "data-label": u.last }, fmt.plainDate(b.lastDate)),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  } catch {
+    /* the findings could not be loaded: the card is only an extra, the assignments above still show */
+  }
+}
+
 // ---- findings: the list of barangays ----------------------------------------------------------
 
 /** One entry per barangay that has findings: its households, containers and last inspection. */
@@ -147,7 +191,7 @@ const csvCell = (value) => {
 
 /** The households as a CSV (UTF-8 with a mark so a spreadsheet reads the ñ in Peñafrancia). */
 function csvBlob(rows) {
-  const lines = [t.csvHeader, ...rows.map((f) => [f.barangayName, f.purokName, f.houseNo, f.surveyDate, f.positive, f.containers].map(csvCell).join(","))];
+  const lines = [t.csvHeader, ...rows.map((f) => [f.barangayName, f.purokName, f.houseNo, f.surveyDate, f.positive, f.containers, f.taskId === null || f.taskId === undefined ? t.notAssigned : t.assigned].map(csvCell).join(","))];
   return new Blob(["﻿" + lines.join("\r\n") + "\r\n"], { type: "text/csv;charset=utf-8" });
 }
 
@@ -314,6 +358,7 @@ function householdLink(f) {
     { class: "house", href: `#finding/${f.id}`, "aria-label": t.openLabel(f.barangayName, f.houseNo) },
     h("span", { class: "house__no" }, t.houseNo(f.houseNo ?? dash)),
     h("span", { class: `house__pos${f.positive > 0 ? " is-positive" : ""}` }, t.positiveOf(f.positive, f.containers)),
+    f.taskId === null || f.taskId === undefined ? h("span", { class: "house__loose" }, t.notAssigned) : null,
   );
 }
 

@@ -27,6 +27,11 @@ export function bhwRoutes({ db, changes, ranking, shareHouseholdDetails }: AppDe
     res.json(listTasksForBarangay(db, req.bhwBarangayId!));
   });
 
+  // The BHW marks an assigned task as finished (My forms). It needs at least one survey submitted for it.
+  router.post("/tasks/:id/finish", (req, res) => {
+    res.json(changes.finishTask(req.bhwBarangayId!, Number(req.params.id)));
+  });
+
   // The barangay's recent surveys, so every phone that holds the barangay link sees the same list. Container counts and
   // who did the interview; a household's details only when the server is set to share them (see listRecentSurveysOfBarangay).
   router.get("/surveys", (req, res) => {

@@ -530,6 +530,7 @@ a.house { color: inherit; text-decoration: none; }
 .feed__title { margin: var(--s-5) 0 var(--s-3); font-size: var(--fs-lg); font-weight: 600; }
 .feed-controls { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--s-4); }
 .feed-controls .field { min-width: 160px; }
+.house__loose { margin-left: var(--s-2); padding: 0 8px; border: 1px dashed var(--line-strong); border-radius: 999px; color: var(--muted); font-size: 11px; white-space: nowrap; } /* a survey with no assignment behind it */
 .feed-controls .btn .icon { width: 16px; height: 16px; margin-right: var(--s-2); }
 /* two choices side by side, the chosen one raised and green (the same family as the zoom buttons) */
 .seg { display: inline-flex; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: var(--r-pill); background: var(--header-row); }

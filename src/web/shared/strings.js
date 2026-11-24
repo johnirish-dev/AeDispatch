@@ -371,7 +371,16 @@ export const strings = {
       positiveOf: (positive, containers) => `${positive} / ${containers}`,
       export: "Export CSV",
       exported: (n, file) => `${n} ${n === 1 ? "finding" : "findings"} exported${file ? ` as ${file}` : ""}`,
-      csvHeader: "Barangay,Purok,House no.,Survey date,Positive containers,Containers inspected",
+      csvHeader: "Barangay,Purok,House no.,Survey date,Positive containers,Containers inspected,Assignment",
+      assigned: "Assigned",
+      notAssigned: "Not assigned",
+      unassigned: {
+        title: "Surveys without an assignment",
+        note: "A BHW can start a survey without a task from the LGU. These surveys are saved and counted in the scores, but they are not part of any assignment above.",
+        households: (n) => `${n} ${n === 1 ? "household" : "households"}`,
+        last: "Last survey",
+        open: (name) => `Open the findings of ${name}`,
+      },
       exportPanel: {
         title: "Export CSV",
         summary: (n, subject) => `${n} ${n === 1 ? "household" : "households"} from ${subject}.`,

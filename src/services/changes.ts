@@ -344,6 +344,21 @@ export class DataChanges {
     return { surveyId };
   }
 
+  /**
+   * The BHW says the assigned task is finished (from My forms). It has to belong to the barangay and have at least one
+   * survey behind it; finishing a task that is already finished changes nothing.
+   */
+  finishTask(barangayId: number, taskIdRaw: unknown): { taskId: number; status: TaskStatus } {
+    const taskId = v.int(taskIdRaw, "taskId", 1, Number.MAX_SAFE_INTEGER);
+    const task = getTask(this.db, taskId);
+    if (!task || task.barangayId !== barangayId) throw new AppError(404, "That task is not assigned to your barangay.");
+    if (task.status === "completed") return { taskId, status: "completed" };
+    const surveys = (this.db.prepare("SELECT COUNT(*) AS n FROM entomological_survey WHERE task_id = ?").get(taskId) as { n: number }).n;
+    if (surveys === 0) throw new AppError(409, "Submit at least one household survey for this task before marking it finished.");
+    updateTaskStatus(this.db, taskId, "completed", this.ranking.now().toISOString());
+    return { taskId, status: "completed" };
+  }
+
   private checkContainers(input: unknown, noContainersFound: boolean): NewContainer[] {
     const list = input === undefined ? [] : input;
     if (!Array.isArray(list)) throw new AppError(400, "containers must be a list.");

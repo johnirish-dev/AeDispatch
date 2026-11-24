@@ -4,6 +4,7 @@ import { renderFormPaper } from './formpaper.js';
 import { icon } from './icons.js';
 import { esc } from './review.js';
 import { showModal } from './alerts.js';
+import { get, post } from '../shared/api.js';
 
 function formatRelativeTime(ts) {
   if (!ts) return '';
@@ -43,10 +44,26 @@ const SORTS = {
   status:      { label: 'Status (drafts first)', cmp: (a, b) => (KIND_ORDER[a.kind] - KIND_ORDER[b.kind]) || (b.ts - a.ts) }
 };
 
+const TASK_NAMES = { search_and_destroy: 'Tier 1 · Search & destroy', spot_check: 'Spot check', tier2_verification: 'Tier 2 review' };
+const TASK_STATES = { new: 'Not started', in_progress: 'In progress' };
+
 export async function renderMyForms(root, initialFilter) {
   const me = window.bhwContext;
   const puroks = me?.puroks || [];
   await Store.fetchServerSurveys();
+
+  // The officer's open assignments for this barangay. Without a connection the panel is simply left out.
+  let tasks = [];
+  const loadTasks = async () => {
+    try {
+      const all = await get('/api/bhw/tasks');
+      window.bhwTasks = all;
+      tasks = all.filter(t => t.status !== 'completed');
+    } catch {
+      tasks = [];
+    }
+  };
+  await loadTasks();
 
   let searchQuery = '';
   const FILTERS = ['draft', 'pending', 'synced', 'positive'];
@@ -251,6 +268,19 @@ export async function renderMyForms(root, initialFilter) {
         <a href="#/survey" class="bhw-pill-btn primary">${icon('plus', 14)} New household survey</a>
       </div>
 
+      ${tasks.length === 0 ? '' : `
+      <section class="bhw-panel bhw-tasks" aria-labelledby="tasks-title">
+        <h2 id="tasks-title">Assignments from the LGU</h2>
+        ${tasks.map(t => `
+          <div class="bhw-task-row">
+            <div>
+              <strong>${esc(TASK_NAMES[t.type] || 'Field task')}</strong>
+              <div class="bhw-task-meta">${esc(TASK_STATES[t.status] || t.status)} · ${t.households} household${t.households === 1 ? '' : 's'} submitted${t.puroks && t.puroks.length ? ` · ${esc(t.puroks.join(', '))}` : ''}</div>
+            </div>
+            <button type="button" class="bhw-pill-btn outline sm" data-finish="${t.id}" ${t.households === 0 ? 'disabled title="Submit a household survey first"' : ''}>Mark finished</button>
+          </div>`).join('')}
+      </section>`}
+
       <div class="bhw-filter-bar bhw-forms-filters">
         <div style="position:relative; display:flex; align-items:center;">
           <span style="position:absolute; left:14px; color:#6B7280; display:inline-flex; pointer-events:none;">${icon('search', 15)}</span>
@@ -285,6 +315,32 @@ export async function renderMyForms(root, initialFilter) {
 
       <section class="bhw-panel bhw-flist" id="forms-rows"></section>
     `;
+
+    root.querySelectorAll('[data-finish]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const id = Number(btn.dataset.finish);
+        const task = tasks.find(t => t.id === id);
+        const choice = await showModal({
+          type: 'warning',
+          title: 'Mark this task as finished?',
+          message: `The LGU will see "${TASK_NAMES[task?.type] || 'the task'}" as completed. Only do this when every household for it has been surveyed.`,
+          actions: [
+            { label: 'Not yet', value: 'cancel' },
+            { label: 'Mark finished', value: 'finish', primary: true }
+          ]
+        });
+        if (choice !== 'finish') return;
+        btn.disabled = true;
+        try {
+          await post(`/api/bhw/tasks/${id}/finish`);
+          await loadTasks();
+          render();
+        } catch (err) {
+          btn.disabled = false;
+          await showModal({ type: 'error', title: 'Could not mark it finished', message: err?.message || 'Check your connection and try again.' });
+        }
+      });
+    });
 
     // Only the list is redrawn while typing, so the search box keeps focus and the caret
     const searchEl = root.querySelector('#q-search');

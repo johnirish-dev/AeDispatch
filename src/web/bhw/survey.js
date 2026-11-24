@@ -115,7 +115,6 @@ export async function renderSurvey(root, draftId) {
     surveyedBy: '',
     surveyDate: '',
     noContainersFound: false,
-    completeTask: false,
     certified: false,
     containers: createDefaultContainers()
   };
@@ -774,13 +773,6 @@ export async function renderSurvey(root, draftId) {
             <strong style="font-size:13px;">I certify that the information provided in this Dengue Form 5 survey is true and correct.</strong>
           </div>
 
-          ${state.taskId ? `
-          <div class="bhw-switch-row bhw-cert-switch">
-            <button id="sw-complete" type="button" class="bhw-switch ${state.completeTask ? 'on' : ''}">
-              <div class="bhw-switch-knob"></div>
-            </button>
-            <strong style="font-size:13px;">Mark the officer's task as finished when I submit. Leave this off if you will add more households.</strong>
-          </div>` : ''}
         </section>
 
         <div id="submit-alert" class="bhw-alert-slot"></div>
@@ -806,14 +798,6 @@ export async function renderSurvey(root, draftId) {
         state.surveyedBy = formatPersonName(container.querySelector('#f-surveyedBy').value.trim());
         state.surveyDate = dmyToISO(container.querySelector('#f-surveyDate').value.trim());
         state.certified = !state.certified;
-        render();
-      });
-
-      // Only when this form belongs to a task the officer assigned.
-      container.querySelector('#sw-complete')?.addEventListener('click', () => {
-        state.surveyedBy = formatPersonName(container.querySelector('#f-surveyedBy').value.trim());
-        state.surveyDate = dmyToISO(container.querySelector('#f-surveyDate').value.trim());
-        state.completeTask = !state.completeTask;
         render();
       });
 
@@ -870,8 +854,7 @@ export async function renderSurvey(root, draftId) {
             positive: Number(c.positive),
             larvaeCount: Number(c.larvaeCount),
             pupaeCount: Number(c.pupaeCount)
-          })),
-          completeTask: Boolean(state.taskId) && Boolean(state.completeTask)
+          }))
         };
 
         try {

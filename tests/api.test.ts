@@ -466,6 +466,46 @@ describe("BHW survey through the API", () => {
     ...extra,
   });
 
+  it("a BHW can mark an assigned task as finished only after a survey was submitted for it", async () => {
+    const api = await startApi();
+    try {
+      const officer = await api.officer();
+      const tasks = (await officer.get("/api/officer/assignments")).body as { id: number; barangayName: string; status: string }[];
+      const open = tasks.find((t) => t.status === "new")!;
+      expect(open, "the seed should have a task that has not started").toBeDefined();
+      const bhw = api.client().withBhwToken(tokenFor(api, open.barangayName));
+      const me = (await bhw.get("/api/bhw/me")).body as { puroks: { id: number }[] };
+
+      // no survey yet: refused, and the list says 0 households
+      const early = await bhw.post(`/api/bhw/tasks/${open.id}/finish`);
+      expect(early.status).toBe(409);
+      const listed = (await bhw.get("/api/bhw/tasks")).body as { id: number; households: number; status: string }[];
+      expect(listed.find((t) => t.id === open.id)).toMatchObject({ households: 0, status: "new" });
+
+      // a survey for the task moves it to in progress and is counted
+      const sent = await bhw.post("/api/bhw/surveys", survey(me.puroks[0].id, { taskId: open.id }));
+      expect(sent.status).toBe(201);
+      const mid = (await bhw.get("/api/bhw/tasks")).body as { id: number; households: number; status: string }[];
+      expect(mid.find((t) => t.id === open.id)).toMatchObject({ households: 1, status: "in_progress" });
+
+      // now it can be finished, and the officer sees it completed; doing it again changes nothing
+      const done = await bhw.post(`/api/bhw/tasks/${open.id}/finish`);
+      expect(done.status).toBe(200);
+      expect(done.body).toMatchObject({ taskId: open.id, status: "completed" });
+      expect((await bhw.post(`/api/bhw/tasks/${open.id}/finish`)).status).toBe(200);
+      const after = (await officer.get("/api/officer/assignments")).body as { id: number; status: string }[];
+      expect(after.find((t) => t.id === open.id)!.status).toBe("completed");
+
+      // another barangay's token cannot finish it, and it needs the token at all
+      const other = tasks.find((t) => t.barangayName !== open.barangayName)!;
+      const stranger = api.client().withBhwToken(tokenFor(api, other.barangayName));
+      expect((await stranger.post(`/api/bhw/tasks/${open.id}/finish`)).status).toBe(404);
+      expect((await api.client().post(`/api/bhw/tasks/${open.id}/finish`)).status).toBe(401);
+    } finally {
+      await api.close();
+    }
+  });
+
   it("changes the ranking, appears in the findings, and is logged without household details", async () => {
     const api = await startApi();
     try {
