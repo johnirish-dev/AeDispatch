@@ -212,6 +212,15 @@ function renderIntro() {
     $(id).hidden = i !== state.introIndex;
   });
   $$("#intro-dots span").forEach((dot, i) => dot.classList.toggle("active", i === state.introIndex));
+  if ($("intro-back")) $("intro-back").hidden = state.introIndex === 0;
+  if ($("intro-skip")) $("intro-skip").classList.toggle("is-hidden", state.introIndex === 2);
+}
+
+function prevIntro() {
+  if (state.introIndex > 0) {
+    state.introIndex -= 1;
+    renderIntro();
+  }
 }
 
 function nextIntro() {
@@ -225,7 +234,7 @@ function nextIntro() {
 
 // ---- choosing a barangay -------------------------------------------------------------------
 
-const plain = (text) => text.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+const plain = (text) => text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
 function renderBarangayList() {
   const list = $("bgy-list");
@@ -856,6 +865,7 @@ function wire() {
   $$(".nav-tab").forEach((tab) => tab.addEventListener("click", () => showScreen(tab.dataset.nav)));
 
   $("intro-next").addEventListener("click", nextIntro);
+  $("intro-back")?.addEventListener("click", prevIntro);
   $("intro-skip").addEventListener("click", () => openBarangayScreen(false));
   $("bgy-back").addEventListener("click", () => {
     if (state.fromHome) showScreen("screen-home");
