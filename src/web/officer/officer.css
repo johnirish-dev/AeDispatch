@@ -47,22 +47,9 @@
 .login__card .btn--block { transition: transform 0.12s var(--ease-out), background-color 0.15s var(--ease-out); }
 .login__card .btn--block:active { transform: scale(0.985); }
 
-/* one entrance when the page opens: the words rise into place one after another, then the form */
-@keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
-.login__brand .brand { animation: rise 0.6s var(--ease-out) both; }
-.login__slogan { animation: rise 0.7s 0.1s var(--ease-out) both; }
-.login__intro .login__tagline { animation: rise 0.7s 0.2s var(--ease-out) both; }
-.login__points li { animation: rise 0.6s var(--ease-out) both; }
-.login__points li:nth-child(1) { animation-delay: 0.32s; }
-.login__points li:nth-child(2) { animation-delay: 0.4s; }
-.login__points li:nth-child(3) { animation-delay: 0.48s; }
-.login__card h1 { animation: rise 0.6s 0.15s var(--ease-out) both; }
-.login__welcome { animation: rise 0.6s 0.22s var(--ease-out) both; }
-.login__card form > * { animation: rise 0.6s var(--ease-out) both; }
-.login__card form > :nth-child(1) { animation-delay: 0.3s; }
-.login__card form > :nth-child(2) { animation-delay: 0.38s; }
-.login__card form > :nth-child(3) { animation-delay: 0.46s; }
-.login__card form > :nth-child(4) { animation-delay: 0.52s; }
+/* the two panels fade in once when the page opens */
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+.login__brand, .login__main { animation: fade-in 0.35s ease-out both; }
 /* a wrong password shakes the form once */
 @keyframes shake { 0%, 100% { transform: none; } 20% { transform: translateX(-8px); } 40% { transform: translateX(7px); } 60% { transform: translateX(-5px); } 80% { transform: translateX(3px); } }
 .login__card form.shake { animation: shake 0.4s var(--ease-out); }
@@ -103,13 +90,6 @@
 .clock { display: grid; gap: 0; padding: 6px var(--s-4); border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--shadow); }
 .clock__date { font-size: var(--fs-md); font-weight: 500; letter-spacing: -0.01em; }
 .clock__time { color: var(--muted); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
-
-/* ---------- the entrance on the dashboard and the priority queue: once, short, and only on the first draw ---------- */
-@keyframes rise-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
-@keyframes bar-grow { from { width: 0; } }
-.is-entering .score__fill { animation: bar-grow 0.8s 0.2s var(--ease-out) both; }
-.focus__list.is-entering > .focus__item, .list.is-entering > .list__item { animation: rise-in 0.45s var(--ease-out) both; animation-delay: calc(var(--n, 0) * 80ms); }
-.is-entering > tr.row-enter { animation: rise-in 0.4s var(--ease-out) both; animation-delay: calc(var(--n, 0) * 50ms); }
 
 /* ---------- trends ---------- */
 .chart-skeleton { height: 180px; margin-top: var(--s-4); }

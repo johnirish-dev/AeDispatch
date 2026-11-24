@@ -15,8 +15,7 @@ const t = strings.officer.queue;
 const LEVELS = ["high", "elevated", "moderate", "low"];
 const TREND_ORDER = { rising: 0, flat: 1, falling: 2 };
 
-// `entering` is true only while the first list is drawn: the rows rise in and the bars fill once, and later searches and filters are instant.
-const state = { query: "", risk: "all", sort: "threat", ranking: null, entered: false, entering: false };
+const state = { query: "", risk: "all", sort: "threat", ranking: null };
 
 const els = {};
 
@@ -170,19 +169,7 @@ function renderRows() {
     );
     return;
   }
-  sorted(matches).forEach((b, i) => {
-    const tr = row(b);
-    if (state.entering && i < 10) {
-      tr.classList.add("row-enter"); // only the first rows rise in, so a long list does not feel slow
-      tr.style.setProperty("--n", String(i));
-    }
-    els.tbody.append(tr);
-  });
-  if (state.entering) {
-    els.tbody.classList.add("is-entering");
-    window.setTimeout(() => els.tbody.classList.remove("is-entering"), 1600);
-    state.entering = false;
-  }
+  sorted(matches).forEach((b) => els.tbody.append(row(b)));
 }
 
 async function load() {
@@ -191,8 +178,6 @@ async function load() {
     els.sub.textContent = t.asOf(fmt.dateTime(state.ranking.asOf));
     showState(els.queueState, "ready");
     renderFilterItems();
-    state.entering = !state.entered;
-    state.entered = true;
     renderRows();
   } catch (err) {
     if (err instanceof ApiError && err.status === 401) return;

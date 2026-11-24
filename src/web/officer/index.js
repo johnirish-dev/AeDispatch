@@ -8,7 +8,6 @@ import { ApiError, get } from "../shared/api.js";
 import { clear, h, showState } from "../shared/dom.js";
 import * as fmt from "../shared/format.js";
 import { icon } from "../shared/icons.js";
-import { countUp } from "../shared/motion.js";
 import { mountShell } from "../shared/shell.js";
 import { strings } from "../shared/strings.js";
 import { actionCell, decisionHref, riskBadge, scoreCell, taskIcon, tier2Badge } from "./parts.js";
@@ -35,12 +34,6 @@ function tick() {
   els.time.textContent = fmt.clockTime(now);
   els.clock.dateTime = now.toISOString();
 }
-
-// The entrance (numbers counting up, bars filling, rows rising) plays the first time each part is drawn only,
-// never on the refresh that happens when the person comes back to the tab.
-let firstPaint = true;
-let sidePainted = false;
-const showNumber = (el, n) => (firstPaint ? countUp(el, n) : (el.textContent = String(n)));
 
 // ---- layout (built once; only the data inside changes) -----------------------------
 
@@ -115,10 +108,10 @@ function buildSide() {
 // ---- drawing: barangays that need action ---------------------------------------------
 
 /** One row per barangay: rank, name, score, risk level and the action. */
-function focusItem(b, index) {
+function focusItem(b) {
   return h(
     "li",
-    { class: "focus__item", style: `--n:${index}` },
+    { class: "focus__item" },
     h("span", { class: "focus__rank", "aria-label": t.focus.rank(b.rank) }, String(b.rank)),
     h(
       "div",
@@ -152,7 +145,7 @@ function renderFocus(barangays) {
   }
 
   els.focusSub.textContent = t.focus.sub(shown.length, triggered.length);
-  els.focusBody.append(h("ul", { class: `focus__list${firstPaint ? " is-entering" : ""}` }, ...shown.map((b, i) => focusItem(b, i))));
+  els.focusBody.append(h("ul", { class: "focus__list" }, ...shown.map(focusItem)));
   if (triggered.length > shown.length) {
     els.focusBody.append(h("a", { class: "focus__more", href: QUEUE_HREF }, t.focus.more(triggered.length - shown.length), icon("chevron")));
   }
@@ -165,16 +158,15 @@ function renderRanking(ranking) {
   clockKnown = true;
   tick();
 
-  showNumber(els.above, summary.aboveActionThreshold);
-  showNumber(els.monitored, summary.barangaysMonitored);
-  showNumber(els.active, summary.activeAssignments);
-  showNumber(els.cases, summary.weeklyConfirmedCases);
+  els.above.textContent = String(summary.aboveActionThreshold);
+  els.monitored.textContent = String(summary.barangaysMonitored);
+  els.active.textContent = String(summary.activeAssignments);
+  els.cases.textContent = String(summary.weeklyConfirmedCases);
   els.casesNote.textContent = summary.caseWeek ? t.stats.casesNote(summary.caseWeek) : "";
   els.casesNote.hidden = !summary.caseWeek;
 
   renderWeather(summary.weather);
   renderFocus(barangays);
-  firstPaint = false;
 }
 
 // ---- drawing: weather and assignments -------------------------------------------------
@@ -199,18 +191,17 @@ function renderAssignments(list) {
     els.assignments.append(h("p", { class: "muted" }, t.assignmentsEmpty));
     return;
   }
-  const items = list.slice(0, 5).map((a, index) => {
+  const items = list.slice(0, 5).map((a) => {
     const status = fmt.statusBadge(a.status);
     return h(
       "li",
-      { class: "list__item", style: `--n:${index}` },
+      { class: "list__item" },
       taskIcon(a.type),
       h("div", { class: "list__text" }, h("span", { class: "list__title" }, a.barangayName), h("span", { class: "list__sub" }, t.taskShort[a.type] ?? a.type)),
       h("span", { class: status.className }, status.label),
     );
   });
-  els.assignments.append(h("ul", { class: `list${sidePainted ? "" : " is-entering"}` }, ...items));
-  sidePainted = true;
+  els.assignments.append(h("ul", { class: "list" }, ...items));
 }
 
 // ---- loading ----------------------------------------------------------------------

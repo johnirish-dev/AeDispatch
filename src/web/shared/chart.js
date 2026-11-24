@@ -15,9 +15,8 @@
 // week is not finished (`partialLast`), its last stretch is dashed and its marker hollow, because that week's
 // figures are still growing and should not be read as a fall.
 //
-// The first time a chart scrolls into view its line draws itself from left to right, the wash fades in, the dots
-// pop in one after another and the big numbers count up. It plays once (not again on a resize) and is skipped when
-// the person has asked for less motion.
+// The first time a chart scrolls into view its line draws itself from left to right, then the wash and the dots fade
+// in. It plays once (not again on a resize) and is skipped when the person has asked for less motion.
 //
 // Each chart is drawn at the width it really has on the screen (and again when that changes), so the
 // text stays readable on a phone. Every chart has the same hover layer: a hairline follows the pointer
@@ -25,7 +24,9 @@
 // numbers are always in a hidden table for screen readers.
 
 import { h, s } from "./dom.js";
-import { calm, countUp } from "./motion.js";
+
+/** True when the system is set to reduce motion. */
+const calm = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 const LINE_WIDTH = 2;
 const DOT_RADIUS = 4; // an 8 px marker
@@ -137,7 +138,7 @@ function buildPanel({ labels, item, title, desc, scale, wide, id, group, partial
     points.forEach((p, i) => {
       if (!p) return;
       const unfinished = partialLast && i === n - 1;
-      svg.appendChild(s("circle", { class: "chart__dot", style: `--i:${i}`, cx: p[0], cy: p[1], r: DOT_RADIUS, fill: unfinished ? "var(--surface)" : item.color, stroke: unfinished ? item.color : "var(--surface)", "stroke-width": 2 }));
+      svg.appendChild(s("circle", { class: "chart__dot", cx: p[0], cy: p[1], r: DOT_RADIUS, fill: unfinished ? "var(--surface)" : item.color, stroke: unfinished ? item.color : "var(--surface)", "stroke-width": 2 }));
     });
     const ring = s("circle", { class: "chart__hover", cx: 0, cy: 0, r: DOT_RADIUS + 3, fill: "none", stroke: item.color, "stroke-width": 2, visibility: "hidden" });
     svg.appendChild(ring);
@@ -299,12 +300,7 @@ export function lineChart({ labels, series, title, desc, shared = true, partialL
               "figcaption",
               { class: "chart__panel-head" },
               h("span", {}, h("i", { class: "chart__key", style: `background:${series[k].color}` }), series[k].name),
-              h(
-                "strong",
-                {},
-                latest === null || latest === undefined ? "–" : h("span", { class: "chart__num", "data-to": String(latest) }, latest),
-                series[k].unit ? h("small", {}, ` ${series[k].unit}`) : null,
-              ),
+              h("strong", {}, latest === null || latest === undefined ? "–" : latest, series[k].unit ? h("small", {}, ` ${series[k].unit}`) : null),
             ),
             panel.holder,
           );
@@ -322,8 +318,7 @@ export function lineChart({ labels, series, title, desc, shared = true, partialL
       if (!entries.some((entry) => entry.isIntersecting)) return;
       watcher.disconnect();
       root.classList.add("chart--go");
-      root.querySelectorAll(".chart__num").forEach((el) => countUp(el, Number(el.dataset.to), (el.dataset.to.split(".")[1] ?? "").length, 900));
-      window.setTimeout(() => root.classList.add("chart--done"), 2600);
+      window.setTimeout(() => root.classList.add("chart--done"), 1500);
     }, { threshold: 0.3 });
     watcher.observe(root);
   }
