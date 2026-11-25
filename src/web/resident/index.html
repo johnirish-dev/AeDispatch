@@ -76,7 +76,10 @@
 
       <div class="onb-bottom">
         <div class="dots" id="intro-dots" aria-hidden="true"><span></span><span></span><span></span></div>
-        <button type="button" class="btn-primary-pill" id="intro-next"></button>
+        <div class="intro-actions">
+          <button type="button" class="intro-back-btn" id="intro-back" hidden>&lsaquo; <span data-i18n="bgy.back">Back</span></button>
+          <button type="button" class="btn-primary-pill" id="intro-next"></button>
+        </div>
       </div>
     </section>
 
@@ -589,5 +592,28 @@
   </div>
 
   <script type="module" src="/resident/app.js"></script>
+  <script>
+    (function syncIntroControls() {
+      const dotsWrap = document.getElementById("intro-dots");
+      const backBtn = document.getElementById("intro-back");
+      const skipBtn = document.getElementById("intro-skip");
+      if (!dotsWrap || !backBtn || !skipBtn) return;
+
+      function updateControls() {
+        const dots = Array.from(dotsWrap.children);
+        const activeIndex = dots.findIndex((d) => d.classList.contains("active"));
+        backBtn.hidden = activeIndex <= 0;
+        skipBtn.classList.toggle("is-hidden", activeIndex === dots.length - 1);
+      }
+
+      new MutationObserver(updateControls).observe(dotsWrap, {
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["class"],
+      });
+
+      updateControls();
+    })();
+  </script>
 </body>
 </html>

@@ -595,7 +595,7 @@ body {
   margin-top: 6px;
 }
 
-/* Alerts Card Accent (R3): a tinted border and a dot before the level, not a thick side bar */
+/* Alerts Card Accent (R3) */
 .alert-card-elevated { border-color: var(--ae-amber); }
 .alert-card-moderate { border-color: var(--ae-navy); }
 .alert-card-low { border-color: var(--ae-teal); }
@@ -813,6 +813,7 @@ body {
   border-radius: 999px;
   margin-top: 2px;
 }
+
 /* =========================================================
    Intro, barangay choice, check-in and sign-in screens
    ========================================================= */
@@ -903,6 +904,11 @@ body {
   min-height: 44px;
 }
 
+#intro-skip.is-hidden {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .slide-body {
   flex: 1;
   display: flex;
@@ -914,18 +920,40 @@ body {
   padding: 8px 4px;
 }
 
+/* Concentric Pulsating Orb Animation */
 .orb {
   --orb-core: var(--ae-amber);
   --orb-ring: #fdebc8;
   --orb-ring-outer: #fef6e4;
+  position: relative;
   width: 150px;
   height: 150px;
   border-radius: 50%;
   display: grid;
   place-items: center;
-  background: var(--orb-ring);
-  box-shadow: 0 0 0 24px var(--orb-ring-outer);
+  background: transparent;
   margin-bottom: 18px;
+}
+
+.orb::before,
+.orb::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.orb::before {
+  inset: -24px;
+  background: var(--orb-ring-outer);
+  animation: orb-halo-outer 2.6s ease-in-out infinite;
+}
+
+.orb::after {
+  inset: 0;
+  background: var(--orb-ring);
+  animation: orb-halo-mid 2.6s ease-in-out 0.15s infinite;
 }
 
 .orb-teal {
@@ -941,6 +969,8 @@ body {
 }
 
 .orb-core {
+  position: relative;
+  z-index: 2;
   width: 76px;
   height: 76px;
   border-radius: 50%;
@@ -948,11 +978,64 @@ body {
   place-items: center;
   background: var(--orb-core);
   color: #ffffff;
+  box-shadow: 0 8px 20px rgba(24, 54, 84, 0.14);
+  animation: orb-core-beat 2.6s ease-in-out infinite;
 }
 
 .orb-core svg {
   width: 34px;
   height: 34px;
+  transform-origin: 50% 4px;
+  animation: orb-icon-sway 2.6s ease-in-out infinite;
+}
+
+@keyframes orb-halo-outer {
+  0%, 100% {
+    transform: scale(0.9);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+}
+
+@keyframes orb-halo-mid {
+  0%, 100% {
+    transform: scale(0.94);
+    opacity: 0.78;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+}
+
+@keyframes orb-core-beat {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.06);
+  }
+}
+
+@keyframes orb-icon-sway {
+  0%, 58%, 100% {
+    transform: rotate(0deg);
+  }
+  66% {
+    transform: rotate(7deg);
+  }
+  74% {
+    transform: rotate(-6deg);
+  }
+  82% {
+    transform: rotate(3.5deg);
+  }
+  90% {
+    transform: rotate(-2deg);
+  }
 }
 
 .orb-small {
@@ -993,6 +1076,42 @@ body {
   gap: 12px;
   align-items: stretch;
   margin-top: auto;
+}
+
+/* iBU-style inline Back + Next / Get started button row */
+.intro-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+}
+
+.intro-actions .btn-primary-pill {
+  flex: 1;
+  width: auto;
+  min-height: 50px;
+}
+
+.intro-back-btn {
+  border: none;
+  background: transparent;
+  color: var(--ae-navy);
+  font-family: inherit;
+  font-size: 0.94rem;
+  font-weight: 700;
+  min-height: 50px;
+  padding: 0 16px;
+  border-radius: 999px;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: background 0.15s ease;
+}
+
+.intro-back-btn:hover {
+  background: rgba(24, 54, 84, 0.06);
 }
 
 .dots {
@@ -1318,42 +1437,13 @@ input:focus-visible,
 }
 
 @media (prefers-reduced-motion: reduce) {
-  * {
+  *,
+  .orb::before,
+  .orb::after,
+  .orb-core,
+  .orb-core svg {
+    animation: none !important;
     transition: none !important;
     scroll-behavior: auto !important;
   }
-}
-
-
-/* Confirm: change your barangay */
-.confirm-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  background: rgba(16, 32, 48, 0.55);
-}
-
-.confirm-overlay[hidden] {
-  display: none;
-}
-
-.confirm-card {
-  width: 100%;
-  max-width: 360px;
-  display: grid;
-  gap: 10px;
-  padding: 20px;
-  border-radius: var(--res-radius);
-  background: var(--res-surface);
-  box-shadow: 0 12px 32px rgba(16, 32, 48, 0.28);
-}
-
-.confirm-actions {
-  display: grid;
-  gap: 10px;
-  margin-top: 6px;
 }
