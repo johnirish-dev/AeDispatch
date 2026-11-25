@@ -86,12 +86,53 @@ export function renderContainersReview({ conts, totals, editHtml = '' }) {
       </tr>`;
   }).join('');
 
+  const mobileMetrics = (values, natural = false) => {
+    const parts = [
+      `Total: ${values.total}`,
+      ...(natural ? [] : [`Cover: ${values.withCover}`, `No cover: ${values.withoutCover}`]),
+      `Larvae: ${values.larvae}`,
+      `Pupae: ${values.pupae}`
+    ];
+    return parts.join(' · ');
+  };
+
+  const mobileGroups = groups.map((g) => {
+    const rows = g.key === '__other' ? loose : conts.filter((c) => c.location === g.key);
+    if (rows.length === 0) return '';
+    const sub = sumGroup(rows);
+    const natural = g.key === 'natural';
+    return `
+      <section class="bhw-mobile-category-card">
+        <h4>${g.label}</h4>
+        <div class="bhw-mobile-category-items">
+          ${rows.map(c => `
+            <div class="bhw-mobile-container-item">
+              <div class="bhw-mobile-container-name">
+                <strong>${esc(c.containerType)}</strong>
+                ${Number(c.positive) > 0 ? `<span class="bhw-mobile-positive-badge">${c.positive} Positive</span>` : ''}
+              </div>
+              <div class="bhw-mobile-container-metrics">${mobileMetrics({ total: c.total, withCover: c.withCover, withoutCover: c.withoutCover, larvae: c.larvaeCount, pupae: c.pupaeCount }, natural)}</div>
+            </div>`).join('')}
+        </div>
+        <div class="bhw-mobile-category-subtotal">${g.short} subtotal · ${mobileMetrics(sub, natural)}</div>
+      </section>`;
+  }).join('');
+
+  const mobileSummary = conts.length === 0 ? '' : `
+    <div class="bhw-mobile-container-summary">
+      <section class="bhw-mobile-all-containers-card">
+        <div class="bhw-mobile-all-header"><strong>All containers</strong><span>Total: ${totals.total}</span></div>
+        <div class="bhw-mobile-all-line">Positive (+): ${totals.positive} · Cover: ${totals.withCover} · No cover: ${totals.withoutCover}</div>
+        <div class="bhw-mobile-all-line">Larvae: ${totals.larvae} · Pupae: ${totals.pupae}</div>
+      </section>
+      ${mobileGroups}
+    </div>`;
+
   return `
     <div class="bhw-review-box bhw-cont-review">
       <div class="bhw-review-hdr">
         <div class="bhw-review-titles">
           <span class="bhw-review-title">Water containers</span>
-          <span class="bhw-review-sub">Dengue Form 5</span>
         </div>
         ${editHtml}
       </div>
@@ -134,6 +175,7 @@ export function renderContainersReview({ conts, totals, editHtml = '' }) {
               </tr>
             </tfoot>
           </table>
-        </div>`}
+        </div>
+        ${mobileSummary}`}
     </div>`;
 }

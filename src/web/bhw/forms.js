@@ -31,6 +31,7 @@ const withBlankLast = (get, dir) => (a, b) => {
   return dir * text(x, y);
 };
 const KIND_ORDER = { draft: 0, pending: 1, synced: 2 };
+const purokLabel = (name, id) => name || (id ? `Purok ${id}` : 'No purok selected');
 
 const SORTS = {
   recent:      { label: 'Most recent', cmp: (a, b) => b.ts - a.ts },
@@ -73,6 +74,7 @@ export async function renderMyForms(root, initialFilter) {
   let viewingForm = null;
   let paperZoom = 1;
   let paperResizeHandler = null;
+  let mobileFabOpen = false;
 
   const getCombined = () => {
     const drafts = Store.getDrafts().map(d => ({
@@ -80,7 +82,7 @@ export async function renderMyForms(root, initialFilter) {
       kind: 'draft',
       houseNo: d.form.houseNo,
       head: d.form.headOfFamily,
-      purok: d.form.purokName || `Purok ${d.form.purokId}`,
+      purok: purokLabel(d.form.purokName, d.form.purokId),
       time: formatRelativeTime(d.savedAt),
       ts: d.savedAt || 0,
       progress: d.progress || 66,
@@ -94,13 +96,13 @@ export async function renderMyForms(root, initialFilter) {
       lastError: q.lastError || '',
       houseNo: q.payload.houseNo,
       head: q.payload.headOfFamily,
-      purok: q.purokName || `Purok ${q.payload.purokId}`,
+      purok: purokLabel(q.purokName, q.payload.purokId),
       time: formatRelativeTime(q.queuedAt),
       ts: q.queuedAt || 0,
       containers: q.payload.containers || [],
       details: {
         ...q.payload,
-        purokName: q.purokName || `Purok ${q.payload.purokId}`,
+        purokName: purokLabel(q.purokName, q.payload.purokId),
         storeys: q.payload.storeys === 1 ? 'Single storey' : q.payload.storeys === 2 ? '2 or more storeys' : (q.payload.storeys || ''),
         screening: q.payload.screened === true ? 'Screened' : q.payload.screened === false ? 'Unscreened' : (q.payload.screening || '')
       }
@@ -110,7 +112,7 @@ export async function renderMyForms(root, initialFilter) {
       kind: 'synced',
       houseNo: s.houseNo,
       head: s.headOfFamily,
-      purok: s.purokName || `Purok ${s.purokId}`,
+      purok: purokLabel(s.purokName, s.purokId),
       time: formatRelativeTime(s.surveyedAt),
       ts: s.surveyedAt || 0,
       containers: s.containers || [],
@@ -261,11 +263,10 @@ export async function renderMyForms(root, initialFilter) {
 
     root.innerHTML = `
       <div class="bhw-topbar bhw-forms-topbar">
-        <div>
+        <div class="bhw-forms-heading-row">
           <h1 class="bhw-page-title">My forms</h1>
-          <p class="bhw-page-subtitle">${all.length} household ${all.length === 1 ? 'form' : 'forms'} recorded in this barangay and on this phone</p>
+          <a href="#/survey" class="bhw-pill-btn primary">${icon('plus', 14)} New survey</a>
         </div>
-        <a href="#/survey" class="bhw-pill-btn primary">${icon('plus', 14)} New household survey</a>
       </div>
 
       ${tasks.length === 0 ? '' : `
@@ -286,34 +287,55 @@ export async function renderMyForms(root, initialFilter) {
           <span style="position:absolute; left:14px; color:#6B7280; display:inline-flex; pointer-events:none;">${icon('search', 15)}</span>
           <input id="q-search" class="bhw-search-input" style="padding-left:38px;" type="search" placeholder="Search by house no., name or purok" value="${esc(searchQuery)}" autocomplete="off">
         </div>
-        <div class="bhw-field">
-          <label for="q-status">Status</label>
-          <select id="q-status" class="bhw-filter-select">
-            <option value="all">All (${all.length})</option>
-            <option value="draft">Draft (${counts.draft})</option>
-            <option value="pending">Pending sync (${counts.pending})</option>
-            <option value="synced">Submitted (${counts.synced})</option>
-            <option value="positive">With positive findings (${counts.positive})</option>
-          </select>
+        <div class="bhw-forms-filter-pills">
+          <div class="bhw-field">
+            <label for="q-status">Status</label>
+            <select id="q-status" class="bhw-filter-select" aria-label="Status">
+              <option value="all">All (${all.length})</option>
+              <option value="draft">Draft (${counts.draft})</option>
+              <option value="pending">Pending sync (${counts.pending})</option>
+              <option value="synced">Submitted (${counts.synced})</option>
+              <option value="positive">With positive findings (${counts.positive})</option>
+            </select>
+          </div>
+          <div class="bhw-field">
+            <label for="q-purok">Purok</label>
+            <select id="q-purok" class="bhw-filter-select" aria-label="Purok">
+              <option value="all">All puroks</option>
+              ${puroks.map(p => `<option value="${esc(p.name)}">${esc(p.name)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="bhw-field bhw-sort-field">
+            <label for="q-sort">Sort by</label>
+            <select id="q-sort" class="bhw-filter-select" aria-label="Sort by">
+              ${Object.entries(SORTS).map(([k, s]) => `<option value="${k}">${s.label}</option>`).join('')}
+            </select>
+          </div>
         </div>
-        <div class="bhw-field">
-          <label for="q-purok">Purok</label>
-          <select id="q-purok" class="bhw-filter-select">
-            <option value="all">All puroks</option>
-            ${puroks.map(p => `<option value="${esc(p.name)}">${esc(p.name)}</option>`).join('')}
-          </select>
-        </div>
-        <div class="bhw-field">
-          <label for="q-sort">Sort by</label>
-          <select id="q-sort" class="bhw-filter-select">
-            ${Object.entries(SORTS).map(([k, s]) => `<option value="${k}">${s.label}</option>`).join('')}
-          </select>
+        <div class="bhw-mobile-sort-wrap">
+          <button id="mobile-sort-toggle" type="button" class="bhw-mobile-sort-toggle" aria-expanded="false" aria-controls="mobile-sort-menu">
+            <span>Sort: <strong id="mobile-sort-label">${esc(SORTS[sortKey].label)}</strong></span>${icon('chevronUp', 13, 1.8)}
+          </button>
+          <div id="mobile-sort-menu" class="bhw-mobile-sort-menu" role="menu" hidden>
+            ${Object.entries(SORTS).map(([k, s]) => `<button type="button" role="menuitem" data-mobile-sort="${esc(k)}">${esc(s.label)}</button>`).join('')}
+          </div>
         </div>
       </div>
 
       <div id="forms-count" class="bhw-forms-count" aria-live="polite" style="font-size:12px; color:#6B7280; margin-bottom:12px;"></div>
 
       <section class="bhw-panel bhw-flist" id="forms-rows"></section>
+
+      <div class="bhw-mobile-fab-scrim" id="mobile-fab-scrim" hidden></div>
+      <div class="bhw-mobile-fab">
+        <div class="bhw-mobile-fab-actions" id="mobile-fab-actions" hidden>
+          <a href="#/survey" class="bhw-mobile-fab-action">${icon('plus', 15)} New survey</a>
+        </div>
+        <button id="mobile-fab-toggle" type="button" aria-label="Open new survey actions" aria-expanded="false">
+          <span class="bhw-mobile-fab-icon bhw-mobile-fab-icon-plus">${icon('plus', 21, 2)}</span>
+          <span class="bhw-mobile-fab-icon bhw-mobile-fab-icon-close">${icon('x', 21, 2)}</span>
+        </button>
+      </div>
     `;
 
     root.querySelectorAll('[data-finish]').forEach((btn) => {
@@ -347,12 +369,46 @@ export async function renderMyForms(root, initialFilter) {
     const statusEl = root.querySelector('#q-status');
     const purokEl = root.querySelector('#q-purok');
     const sortEl = root.querySelector('#q-sort');
+    const mobileSortToggle = root.querySelector('#mobile-sort-toggle');
+    const mobileSortLabel = root.querySelector('#mobile-sort-label');
+    const mobileSortMenu = root.querySelector('#mobile-sort-menu');
+    const mobileFabToggle = root.querySelector('#mobile-fab-toggle');
+    const mobileFabActions = root.querySelector('#mobile-fab-actions');
+    const mobileFabScrim = root.querySelector('#mobile-fab-scrim');
     statusEl.value = statusFilter;
     purokEl.value = purokFilter;
     sortEl.value = sortKey;
+    mobileSortLabel.textContent = SORTS[sortKey].label;
 
     const countEl = root.querySelector('#forms-count');
     const listEl = root.querySelector('#forms-rows');
+
+    const setMobileFabOpen = (open) => {
+      mobileFabOpen = open;
+      mobileFabActions.hidden = !open;
+      mobileFabScrim.hidden = !open;
+      mobileFabToggle.classList.toggle('is-open', open);
+      mobileFabToggle.setAttribute('aria-expanded', String(open));
+      mobileFabToggle.setAttribute('aria-label', open ? 'Close new survey actions' : 'Open new survey actions');
+    };
+
+    mobileSortToggle.addEventListener('click', () => {
+      const open = mobileSortMenu.hidden;
+      mobileSortMenu.hidden = !open;
+      mobileSortToggle.setAttribute('aria-expanded', String(open));
+    });
+    mobileSortMenu.addEventListener('click', (event) => {
+      const option = event.target.closest('[data-mobile-sort]');
+      if (!option) return;
+      sortKey = option.dataset.mobileSort;
+      sortEl.value = sortKey;
+      mobileSortLabel.textContent = SORTS[sortKey].label;
+      mobileSortMenu.hidden = true;
+      mobileSortToggle.setAttribute('aria-expanded', 'false');
+      renderList();
+    });
+    mobileFabToggle.addEventListener('click', () => setMobileFabOpen(!mobileFabOpen));
+    mobileFabScrim.addEventListener('click', () => setMobileFabOpen(false));
 
     const renderList = () => {
       const tokens = norm(searchQuery).replace(/#/g, ' ').split(/\s+/).filter(Boolean);
@@ -372,7 +428,7 @@ export async function renderMyForms(root, initialFilter) {
           <div class="bhw-empty">
             <strong>No forms recorded yet</strong>
             <p>Household surveys you save or submit, and the barangay's recent submitted forms, will show up here.</p>
-            <a href="#/survey" class="bhw-pill-btn primary sm">${icon('plus', 12)} New household survey</a>
+            <a href="#/survey" class="bhw-pill-btn primary sm">${icon('plus', 12)} New survey</a>
           </div>`;
         return;
       }
@@ -416,7 +472,31 @@ export async function renderMyForms(root, initialFilter) {
           : `<span class="bhw-status-badge ${f.needsReview ? 'needs-review' : f.kind}">${f.needsReview ? 'Needs attention' : f.kind === 'pending' ? 'Pending sync' : 'Submitted'}</span>`;
 
         const house = String(f.houseNo || '—');
+        const displayName = f.head || 'Unnamed';
+        const mobileStatus = f.kind === 'draft'
+          ? '<span class="bhw-status-badge draft">Draft</span>'
+          : f.needsReview
+            ? '<span class="bhw-status-badge needs-review">Needs attention</span>'
+            : f.kind === 'pending'
+              ? '<span class="bhw-status-badge pending">Pending sync</span>'
+              : '<span class="bhw-status-badge synced">Submitted</span>';
+        const mobileFinding = f.posCont > 0 ? 'Positive finding' : 'No positive findings';
+        const mobileAction = f.kind === 'draft' || f.needsReview
+          ? `<span class="bhw-fmobile-menu-wrap">
+              <button type="button" class="bhw-fmobile-more" aria-label="More actions" aria-expanded="false">⋮</button>
+              <span class="bhw-fmobile-menu" hidden><button type="button" class="delete-btn">Delete</button></span>
+            </span>`
+          : '<span class="bhw-fmobile-chevron" aria-hidden="true">›</span>';
         row.innerHTML = `
+          <div class="bhw-fmobile-summary">
+            <div class="bhw-fmobile-primary">
+              <strong>#${esc(house)} · ${esc(displayName)}</strong>
+              <span class="bhw-fmobile-status">${mobileStatus}${mobileAction}</span>
+            </div>
+            <div class="bhw-fmobile-secondary">
+              ${esc(f.purok)}${f.kind === 'draft' || f.needsReview ? '' : ` <span class="bhw-fmobile-finding ${f.posCont > 0 ? 'is-positive' : ''}">· ${mobileFinding}</span>`}
+            </div>
+          </div>
           <div class="bhw-fhouse" data-label="House no.">
             <span class="bhw-fhouse-no">${esc(house)}</span>
           </div>
@@ -433,6 +513,37 @@ export async function renderMyForms(root, initialFilter) {
         `;
 
         const open = () => { paperZoom = 1; viewingForm = f; render(); };
+        const openMobileTarget = () => {
+          if (f.kind === 'draft' || f.needsReview) {
+            window.location.hash = `#/survey/${encodeURIComponent(f.id)}`;
+          } else {
+            open();
+          }
+        };
+        row.addEventListener('click', (e) => {
+          if (!window.matchMedia('(max-width: 639px)').matches) return;
+          if (e.target.closest('.bhw-fmobile-menu-wrap, .delete-btn, .bhw-factions')) return;
+          openMobileTarget();
+        });
+        row.addEventListener('keydown', (e) => {
+          if (!window.matchMedia('(max-width: 639px)').matches) return;
+          if (e.key !== 'Enter' && e.key !== ' ') return;
+          e.preventDefault();
+          openMobileTarget();
+        });
+        if (window.matchMedia('(max-width: 639px)').matches) {
+          row.tabIndex = 0;
+          row.setAttribute('role', 'button');
+          row.setAttribute('aria-label', `${f.kind === 'draft' ? 'Continue' : 'View'} House ${house} ${displayName}`);
+        }
+        row.querySelector('.bhw-fmobile-more')?.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const button = e.currentTarget;
+          const menu = button.nextElementSibling;
+          const isOpen = !menu.hidden;
+          menu.hidden = isOpen;
+          button.setAttribute('aria-expanded', String(!isOpen));
+        });
         if (f.kind !== 'draft' && !f.needsReview) {
           row.addEventListener('click', (e) => {
             if (e.target.closest('.view-btn')) return;
@@ -444,7 +555,7 @@ export async function renderMyForms(root, initialFilter) {
           });
           row.querySelector('.view-btn').addEventListener('click', open);
         } else if (f.kind === 'draft' || f.needsReview) {
-          row.querySelector('.delete-btn').addEventListener('click', async () => {
+          const confirmDelete = async () => {
             const result = await showModal({
               type: 'warning',
               title: 'Delete this draft?',
@@ -459,7 +570,11 @@ export async function renderMyForms(root, initialFilter) {
               else Store.dequeue(f.id);
               render();
             }
-          });
+          };
+          row.querySelectorAll('.delete-btn').forEach(button => button.addEventListener('click', (e) => {
+            e.stopPropagation();
+            confirmDelete();
+          }));
         }
         listEl.appendChild(row);
       });
@@ -468,7 +583,11 @@ export async function renderMyForms(root, initialFilter) {
     searchEl.addEventListener('input', e => { searchQuery = e.target.value; renderList(); });
     statusEl.addEventListener('change', e => { statusFilter = e.target.value; renderList(); });
     purokEl.addEventListener('change', e => { purokFilter = e.target.value; renderList(); });
-    sortEl.addEventListener('change', e => { sortKey = e.target.value; renderList(); });
+    sortEl.addEventListener('change', e => {
+      sortKey = e.target.value;
+      mobileSortLabel.textContent = SORTS[sortKey].label;
+      renderList();
+    });
 
     renderList();
   };

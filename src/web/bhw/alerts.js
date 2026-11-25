@@ -132,7 +132,7 @@ export function showBanner({ id = 'banner', type = 'info', title = '', message =
 
 /* ---------- Modal dialog (blocking) ---------- */
 // Resolves with the clicked action's value, or null when dismissed with Esc or the backdrop.
-export function showModal({ type = 'info', title = '', message = '', actions = [{ label: 'OK', value: 'ok', primary: true }], dismissible = true } = {}) {
+export function showModal({ type = 'info', title = '', message = '', mobileMessage = '', actions = [{ label: 'OK', value: 'ok', primary: true }], dismissible = true } = {}) {
   return new Promise((resolve) => {
     const prevFocus = document.activeElement;
 
@@ -149,7 +149,8 @@ export function showModal({ type = 'info', title = '', message = '', actions = [
 
     const tile = document.createElement('span');
     tile.className = 'bhw-modal-icon';
-    tile.innerHTML = toneIconHtml(type, 24);
+    const modalIcon = type === 'warning' ? 'alert' : (TONE_ICON[type] || 'info');
+    tile.innerHTML = icon(modalIcon, 24, 1.8);
 
     const h = document.createElement('h2');
     h.id = titleId;
@@ -158,10 +159,27 @@ export function showModal({ type = 'info', title = '', message = '', actions = [
 
     const p = document.createElement('p');
     p.className = 'bhw-modal-text';
-    p.textContent = message;
+    if (mobileMessage) {
+      const desktopText = document.createElement('span');
+      desktopText.className = 'bhw-modal-desktop-text';
+      desktopText.textContent = message;
+      const mobileText = document.createElement('span');
+      mobileText.className = 'bhw-modal-mobile-text';
+      mobileText.textContent = mobileMessage;
+      p.append(desktopText, mobileText);
+    } else {
+      p.textContent = message;
+    }
 
     const row = document.createElement('div');
     row.className = 'bhw-modal-actions';
+
+    const content = document.createElement('div');
+    content.className = 'bhw-modal-content';
+    const copy = document.createElement('div');
+    copy.className = 'bhw-modal-copy';
+    copy.append(h, p);
+    content.append(tile, copy);
 
     const onKey = (e) => {
       if (e.key === 'Escape' && dismissible) { e.preventDefault(); close(null); }
@@ -186,12 +204,13 @@ export function showModal({ type = 'info', title = '', message = '', actions = [
       const b = document.createElement('button');
       b.type = 'button';
       b.className = `bhw-pill-btn ${a.primary ? 'primary' : 'outline'}${a.danger ? ' danger' : ''}`;
+      b.dataset.action = a.value;
       b.textContent = a.label;
       b.addEventListener('click', () => close(a.value));
       row.appendChild(b);
     });
 
-    dlg.append(tile, h, p, row);
+    dlg.append(content, row);
     backdrop.appendChild(dlg);
     backdrop.addEventListener('mousedown', (e) => { if (e.target === backdrop && dismissible) close(null); });
     document.addEventListener('keydown', onKey, true);

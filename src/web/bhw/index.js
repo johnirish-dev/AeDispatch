@@ -13,7 +13,7 @@ function registerOfflineShell() {
 function applyContext(me) {
   document.getElementById('user-brgy').textContent = `Barangay ${me.barangay.name}`;
   document.getElementById('user-avatar').textContent = me.barangay.name.substring(0, 2).toUpperCase();
-  document.getElementById('mobile-user-brgy').textContent = `Barangay ${me.barangay.name}`;
+  document.getElementById('mobile-user-brgy').textContent = me.barangay.name;
   document.getElementById('mobile-user-avatar').textContent = me.barangay.name.substring(0, 2).toUpperCase();
   window.bhwContext = me;
 }

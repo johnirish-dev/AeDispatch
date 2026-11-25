@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BHW Field Console - AeDispatch</title>
+  <title>BHW Workspace - AeDispatch</title>
   <link rel="stylesheet" href="../shared/tokens.css">
   <link rel="stylesheet" href="../shared/base.css">
   <link rel="stylesheet" href="../shared/components.css">
@@ -19,7 +19,7 @@
         <img src="../shared/logo.svg" alt="AeDispatch" width="28" height="28">
         <div class="bhw-brand-text">
           <strong>AeDispatch</strong>
-          <span>BHW Field Console</span>
+          <span>BHW Workspace</span>
         </div>
       </div>
       <button
@@ -94,13 +94,23 @@
     </div>
   </aside>
 
-  <div class="bhw-mobile-account" aria-label="Barangay account">
-    <div class="bhw-avatar" id="mobile-user-avatar">–</div>
-    <div class="bhw-mobile-account-text">
-      <strong id="mobile-user-brgy">Barangay</strong>
-      <span>Barangay account</span>
+  <header class="bhw-mobile-header">
+    <div class="bhw-mobile-brand">
+      <img src="../shared/logo.svg" alt="AeDispatch" width="48" height="32">
+      <div class="bhw-mobile-brand-text">
+        <strong>AeDispatch</strong>
+        <span>BHW Workspace</span>
+      </div>
     </div>
-  </div>
+
+    <div class="bhw-mobile-account" aria-label="Barangay account">
+      <div class="bhw-avatar" id="mobile-user-avatar">–</div>
+      <div class="bhw-mobile-account-text">
+        <strong id="mobile-user-brgy">Barangay</strong>
+        <span>Barangay</span>
+      </div>
+    </div>
+  </header>
 
   <nav class="bhw-bottom-nav" aria-label="Mobile Navigation">
     <a href="#/" id="mob-nav-home" class="active" title="Go to Home Dashboard" aria-label="Home">

@@ -142,6 +142,74 @@ export async function renderSurvey(root, draftId) {
   };
 
   let pendingFocus = null;
+  let isDirty = false;
+
+  const syncVisibleFields = () => {
+    const field = (selector) => root.querySelector(selector);
+    if (state.step === 1) {
+      const houseNo = field('#f-houseNo');
+      const purok = field('#f-purokId');
+      const head = field('#f-head');
+      const age = field('#f-age');
+      const sex = field('#f-sex');
+      const civil = field('#f-civil');
+      const occupation = field('#f-occ');
+      const slept = field('#f-slept');
+      const school = field('#f-school');
+      const structure = field('#f-struct');
+      const storeys = field('#f-storeys');
+      const screening = field('#f-screen');
+      const rooms = field('#f-rooms');
+      const surveyedBy = field('#f-surveyedBy-s1');
+      const surveyDate = field('#f-surveyDate-s1');
+      if (houseNo) state.houseNo = houseNo.value.trim();
+      if (purok) {
+        state.purokId = purok.value;
+        const selected = me.puroks.find(p => String(p.id) === String(state.purokId));
+        state.purokName = selected ? selected.name : '';
+      }
+      if (head) state.headOfFamily = formatPersonName(head.value.trim());
+      if (age) state.age = sanitizeNonNegativeInt(age.value, true);
+      if (sex) state.sex = sex.value;
+      if (civil) state.civilStatus = civil.value;
+      if (occupation) state.occupation = formatPersonName(occupation.value.trim());
+      if (slept) state.personsSlept = sanitizeNonNegativeInt(slept.value, true);
+      if (school) state.schoolName = formatPersonName(school.value.trim());
+      if (structure) state.buildingStructure = structure.value;
+      if (storeys) state.storeys = storeys.value;
+      if (screening) state.screening = screening.value;
+      if (rooms) state.rooms = sanitizeNonNegativeInt(rooms.value, true);
+      if (surveyedBy) state.surveyedBy = formatPersonName(surveyedBy.value.trim());
+      if (surveyDate) state.surveyDate = dmyToISO(surveyDate.value.trim());
+    }
+    if (state.step === 3) {
+      const surveyedBy = field('#f-surveyedBy');
+      const surveyDate = field('#f-surveyDate');
+      if (surveyedBy) state.surveyedBy = formatPersonName(surveyedBy.value.trim());
+      if (surveyDate) state.surveyDate = dmyToISO(surveyDate.value.trim());
+    }
+  };
+
+  const releaseExitGuard = () => {
+    if (window.bhwSurveyExitGuard?.owner === root) delete window.bhwSurveyExitGuard;
+    isDirty = false;
+  };
+
+  window.bhwSurveyExitGuard = {
+    owner: root,
+    isDirty: () => isDirty,
+    saveAndExit: () => {
+      syncVisibleFields();
+      const progress = state.step === 1 ? 33 : state.step === 2 ? 66 : 90;
+      const saved = saveCurrentDraft(progress);
+      if (saved) releaseExitGuard();
+      return saved;
+    },
+    discard: releaseExitGuard
+  };
+
+  root.addEventListener('input', () => { isDirty = true; });
+  root.addEventListener('change', () => { isDirty = true; });
 
   const render = () => {
     const selectedPurok = me.puroks.find(p => String(p.id) === String(state.purokId));
@@ -149,9 +217,10 @@ export async function renderSurvey(root, draftId) {
 
     root.innerHTML = `
       <div style="margin-bottom: 14px;">
-        <div class="bhw-eyebrow">DENGUE FORM 5 · NATIONAL DENGUE PREVENTION AND CONTROL PROGRAM</div>
+        <div class="bhw-eyebrow">DENGUE FORM 5</div>
         <h1 class="bhw-page-title">Dengue Entomological Survey</h1>
         <p class="bhw-page-subtitle">House ${state.houseNo || '—'} · ${purokLabel}</p>
+        <button id="btn-survey-back" type="button" class="bhw-back-link bhw-survey-back-link">${icon('chevronLeft', 14, 2)} Back to My forms</button>
       </div>
 
       <div class="bhw-stepper-card">
@@ -175,6 +244,9 @@ export async function renderSurvey(root, draftId) {
     `;
 
     const container = root.querySelector('#step-container');
+    root.querySelector('#btn-survey-back')?.addEventListener('click', () => {
+      window.location.hash = '#/forms';
+    });
 
     // One edit listener at a time on the shared container: editing a field clears its error and the alert above it
     const onEditClear = (extra) => {
@@ -198,45 +270,44 @@ export async function renderSurvey(root, draftId) {
           <div class="bhw-panel-header">
             <div>
               <h2 class="bhw-panel-title">Household information</h2>
-              <p class="bhw-panel-sub">Fields marked <span style="color:#C81E1E">*</span> are required. Only the name of school is optional.</p>
+              <p class="bhw-panel-sub">Fields marked <span style="color:#C81E1E">*</span> are required</p>
             </div>
-            <span class="bhw-collapse-icon">${icon('chevronUp', 14)}</span>
           </div>
 
           <div id="step-alert" class="bhw-alert-slot"></div>
 
-          <div class="bhw-form-grid-4">
-            <div class="bhw-field" data-field="houseNo">
+          <div class="bhw-form-grid-4 bhw-household-location-grid">
+            <div class="bhw-field bhw-house-field" data-field="houseNo">
               <label for="f-houseNo">House no. ${req}</label>
               <input id="f-houseNo" class="bhw-control" type="text" maxlength="40" autocomplete="off" value="${esc(state.houseNo)}">
             </div>
-            <div class="bhw-field">
+            <div class="bhw-field bhw-municipality-field">
               <label>Municipality/City</label>
-              <input class="bhw-control" type="text" value="Daraga" readonly>
+              <input class="bhw-control bhw-readonly-control" type="text" value="Daraga" disabled aria-disabled="true" tabindex="-1">
             </div>
-            <div class="bhw-field" data-field="purokId">
+            <div class="bhw-field bhw-purok-field" data-field="purokId">
               <label for="f-purokId">Purok/Sitio ${req}</label>
               <select id="f-purokId" class="bhw-control">
                 <option value="">Select purok</option>
                 ${me.puroks.map(p => `<option value="${p.id}" ${String(state.purokId) === String(p.id) ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}
               </select>
             </div>
-            <div class="bhw-field">
+            <div class="bhw-field bhw-barangay-field">
               <label>Barangay</label>
-              <input class="bhw-control" type="text" value="${esc(me.barangay.name)}" readonly>
+              <input class="bhw-control bhw-readonly-control" type="text" value="${esc(me.barangay.name)}" disabled aria-disabled="true" tabindex="-1">
             </div>
           </div>
 
-          <div class="bhw-form-grid-2-1-1">
-            <div class="bhw-field" data-field="headOfFamily">
+          <div class="bhw-form-grid-2-1-1 bhw-household-person-grid">
+            <div class="bhw-field bhw-head-field" data-field="headOfFamily">
               <label for="f-head">Head of the family ${req}</label>
               <input id="f-head" class="bhw-control" type="text" placeholder="e.g. John Irish Milallos" autocomplete="off" value="${esc(state.headOfFamily)}">
             </div>
-            <div class="bhw-field" data-field="age">
+            <div class="bhw-field bhw-age-field" data-field="age">
               <label for="f-age">Age ${req}</label>
               ${stepperHtml({ id: 'f-age', value: state.age, min: 1, max: 120, label: 'age' })}
             </div>
-            <div class="bhw-field" data-field="sex">
+            <div class="bhw-field bhw-sex-field" data-field="sex">
               <label for="f-sex">Sex ${req}</label>
               <select id="f-sex" class="bhw-control">
                 <option value="">Select sex</option>
@@ -274,9 +345,8 @@ export async function renderSurvey(root, draftId) {
           <div class="bhw-panel-header">
             <div>
               <h2 class="bhw-panel-title">Building structure</h2>
-              <p class="bhw-panel-sub">Describe the house. All fields are required.</p>
+              <p class="bhw-panel-sub">Describe the house.</p>
             </div>
-            <span class="bhw-collapse-icon">${icon('chevronUp', 14)}</span>
           </div>
 
           <div class="bhw-form-grid-4">
@@ -312,7 +382,6 @@ export async function renderSurvey(root, draftId) {
           <div class="bhw-panel-header">
             <div>
               <h2 class="bhw-panel-title">Surveyor details</h2>
-              <p class="bhw-panel-sub">Specify the Barangay Health Worker conducting this inspection and the survey date.</p>
             </div>
           </div>
           <div class="bhw-form-grid-2">
@@ -327,10 +396,8 @@ export async function renderSurvey(root, draftId) {
           </div>
         </section>
 
-        <div class="bhw-panel bhw-form-actions" style="display:flex; justify-content:space-between; align-items:center; padding:14px 20px;">
-          <button id="btn-cancel" class="bhw-pill-btn outline" type="button">Cancel</button>
+        <div class="bhw-panel bhw-form-actions bhw-step-actions bhw-step-actions-single" style="display:flex; justify-content:flex-end; align-items:center; padding:14px 20px;">
           <div class="bhw-form-action-group" style="display:flex; gap:10px;">
-            <button id="btn-draft" class="bhw-pill-btn outline" type="button">${icon('save', 14)} Save draft</button>
             <button id="btn-next" class="bhw-pill-btn primary" type="button">Next</button>
           </div>
         </div>
@@ -391,11 +458,6 @@ export async function renderSurvey(root, draftId) {
         return errs;
       };
 
-      container.querySelector('#btn-cancel').addEventListener('click', () => { window.location.hash = '#/'; });
-      container.querySelector('#btn-draft').addEventListener('click', () => {
-        bindStep1();
-        if (saveCurrentDraft(33)) window.location.hash = '#/forms';
-      });
       container.querySelector('#btn-next').addEventListener('click', () => {
         const dateText = bindStep1();
         container.querySelectorAll('.bhw-field.has-error').forEach(clearFieldError);
@@ -431,7 +493,7 @@ export async function renderSurvey(root, draftId) {
           <div class="bhw-panel-header">
             <div>
               <h2 class="bhw-panel-title">II. Types of water containers present</h2>
-              <p class="bhw-panel-sub">Fill in only the containers found at this household across Indoor, Outdoor, and Natural sections, or leave unselected if none.</p>
+              <p class="bhw-panel-sub">Select and count only the containers found at this household.</p>
             </div>
           </div>
 
@@ -450,10 +512,9 @@ export async function renderSurvey(root, draftId) {
           </div>
         </section>
 
-        <div class="bhw-panel bhw-form-actions" style="display:flex; justify-content:space-between; align-items:center; padding:14px 20px;">
+        <div class="bhw-panel bhw-form-actions bhw-step-actions" style="display:flex; justify-content:space-between; align-items:center; padding:14px 20px;">
           <button id="btn-prev" class="bhw-pill-btn outline" type="button">Previous</button>
           <div class="bhw-form-action-group" style="display:flex; gap:10px;">
-            <button id="btn-draft" class="bhw-pill-btn outline" type="button">${icon('save', 14)} Save draft</button>
             <button id="btn-next" class="bhw-pill-btn primary" type="button">Next</button>
           </div>
         </div>
@@ -500,7 +561,7 @@ export async function renderSurvey(root, draftId) {
               <div class="bhw-field">
                 <label>Type of container</label>
                 <select class="bhw-control c-type" ${isDisabled ? 'disabled' : ''}>
-                  <option value="">Select type of container (optional)</option>
+                  <option value="">Select type of container </option>
                   ${types.map(t => `<option value="${t}" ${selectedValue === t ? 'selected' : ''}>${t}</option>`).join('')}
                 </select>
               </div>
@@ -553,6 +614,7 @@ export async function renderSurvey(root, draftId) {
           `;
 
           box.querySelector('.c-type').addEventListener('change', e => {
+            isDirty = true;
             const val = e.target.value;
             if (val === 'Others') {
               item.isOther = true;
@@ -600,6 +662,7 @@ export async function renderSurvey(root, draftId) {
           box.querySelector('.bhw-container-nums').addEventListener('input', recalc);
 
           box.querySelector('.rm-btn')?.addEventListener('click', () => {
+            isDirty = true;
             state.containers = state.containers.filter(c => c !== item);
             render();
           });
@@ -609,6 +672,7 @@ export async function renderSurvey(root, draftId) {
 
         sec.querySelector('.bhw-add-small-btn').addEventListener('click', () => {
           if (state.noContainersFound) return;
+          isDirty = true;
           state.containers.push({ location: loc, containerType: '', isOther: false, withCover: 0, withoutCover: 0, total: 0, positive: 0, larvaeCount: 0, pupaeCount: 0 });
           render();
         });
@@ -618,6 +682,7 @@ export async function renderSurvey(root, draftId) {
 
       // Toggle "No containers found": keep sections visible, reset values to empty, and disable inputs
       container.querySelector('#sw-nocont').addEventListener('click', () => {
+        isDirty = true;
         state.noContainersFound = !state.noContainersFound;
         if (state.noContainersFound) {
           state.containers = createDefaultContainers();
@@ -626,9 +691,6 @@ export async function renderSurvey(root, draftId) {
       });
 
       container.querySelector('#btn-prev').addEventListener('click', () => { state.step = 1; render(); });
-      container.querySelector('#btn-draft').addEventListener('click', () => {
-        if (saveCurrentDraft(66)) window.location.hash = '#/forms';
-      });
       onEditClear(() => clearInlineAlert(container.querySelector('#step-alert')));
 
       container.querySelector('#btn-next').addEventListener('click', () => {
@@ -687,15 +749,15 @@ export async function renderSurvey(root, draftId) {
       const completionPct = state.certified ? 100 : 67;
 
       container.innerHTML = `
-        <section class="bhw-panel">
+        <section class="bhw-panel bhw-survey-review-panel">
           <div class="bhw-panel-header">
             <div>
               <h2 class="bhw-panel-title">Review and submit</h2>
-              <p class="bhw-panel-sub">Verify all household, container, and BHW surveyor entries before final submission.</p>
+              <p class="bhw-panel-sub">Review your entries before submitting.</p>
             </div>
           </div>
 
-          ${renderResultCard({ totals, meta: `House ${state.houseNo} · ${state.headOfFamily} · ${purokLabel}, Barangay ${me.barangay.name}` })}
+          ${renderResultCard({ totals, meta: `House ${state.houseNo} · ${state.headOfFamily} · ${purokLabel}` })}
 
           <div class="bhw-review-grid-2col">
             <div class="bhw-review-box no-mb">
@@ -731,7 +793,7 @@ export async function renderSurvey(root, draftId) {
             </div>
           </div>
 
-          ${renderContainersReview({ conts: validConts, totals, editHtml: `<button type="button" id="edit-s2" class="bhw-pill-btn outline sm">${icon('edit', 12)} Edit containers</button>` })}
+          ${renderContainersReview({ conts: validConts, totals, editHtml: `<button type="button" id="edit-s2" class="bhw-review-edit-link">${icon('edit', 13)} Edit</button>` })}
 
           <div class="bhw-review-box no-mb">
             <div class="bhw-review-hdr">
@@ -777,10 +839,9 @@ export async function renderSurvey(root, draftId) {
 
         <div id="submit-alert" class="bhw-alert-slot"></div>
 
-        <div class="bhw-panel bhw-form-actions" style="display:flex; justify-content:space-between; align-items:center; padding:14px 20px;">
+        <div class="bhw-panel bhw-form-actions bhw-step-actions" style="display:flex; justify-content:space-between; align-items:center; padding:14px 20px;">
           <button id="btn-prev" class="bhw-pill-btn outline" type="button">Previous</button>
           <div class="bhw-form-action-group" style="display:flex; gap:10px;">
-            <button id="btn-draft" class="bhw-pill-btn outline" type="button">${icon('save', 14)} Save draft</button>
             <button id="btn-submit" class="bhw-pill-btn primary" type="button" ${!state.certified ? 'disabled' : ''}>${icon('send', 14)} Submit form</button>
           </div>
         </div>
@@ -795,6 +856,7 @@ export async function renderSurvey(root, draftId) {
       container.querySelector('#edit-s2').addEventListener('click', () => { state.step = 2; render(); });
 
       container.querySelector('#sw-cert').addEventListener('click', () => {
+        isDirty = true;
         state.surveyedBy = formatPersonName(container.querySelector('#f-surveyedBy').value.trim());
         state.surveyDate = dmyToISO(container.querySelector('#f-surveyDate').value.trim());
         state.certified = !state.certified;
@@ -802,9 +864,6 @@ export async function renderSurvey(root, draftId) {
       });
 
       container.querySelector('#btn-prev').addEventListener('click', () => { state.step = 2; render(); });
-      container.querySelector('#btn-draft').addEventListener('click', () => {
-        if (saveCurrentDraft(90)) window.location.hash = '#/forms';
-      });
 
       container.querySelector('#btn-submit').addEventListener('click', async () => {
         state.surveyedBy = formatPersonName(container.querySelector('#f-surveyedBy').value.trim());
@@ -876,6 +935,7 @@ export async function renderSurvey(root, draftId) {
             form: { ...state }
           });
           notify.success('Findings submitted', 'The barangay was re-scored.');
+          releaseExitGuard();
           window.location.hash = '#/forms';
         } catch (err) {
           if (err.status === 400 && err.body?.error) {
@@ -899,6 +959,7 @@ export async function renderSurvey(root, draftId) {
           });
           if (draftId) Store.deleteDraft(draftId);
           notify.info('Saved on this phone', 'No connection. Your findings will be sent automatically when the connection returns.');
+          releaseExitGuard();
           window.location.hash = '#/forms';
         }
       });
