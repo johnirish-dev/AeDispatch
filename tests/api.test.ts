@@ -217,7 +217,7 @@ describe("ranked list and decision view", () => {
     expect(view.barangays.every((b) => b.team !== null)).toBe(true);
     expect(view.summary.barangaysMonitored).toBe(view.barangays.length);
     expect(view.summary.aboveActionThreshold).toBe(view.barangays.filter((b) => b.action === "tier1").length);
-    expect(view.summary.activeAssignments).toBe(2); // one new and one in-progress task in the seed
+    expect(view.summary.activeAssignments).toBe(1); // the seed has one task in progress (Peñafrancia) and one finished (Sagpon)
     expect(view.summary.caseWeek).toMatch(/^2026-W\d\d$/);
   });
 
@@ -290,15 +290,17 @@ describe("trend arrows", () => {
 
 // ---- confirm and reject ---------------------------------------------------------
 
+/** A Tier 1 barangay that has no open Tier 1 task yet, so it can be confirmed. */
+async function candidate(api: Api, officer: Client) {
+  const view = await ranking(officer);
+  const tasks = (await officer.get("/api/officer/assignments")).body as { barangayId: number; type: string; status: string }[];
+  const open = new Set(tasks.filter((t) => t.status !== "completed" && t.type === "search_and_destroy").map((t) => t.barangayId));
+  const row = view.barangays.find((b) => b.action === "tier1" && b.team && !open.has(b.barangayId))!;
+  expect(row, "the seed should have a Tier 1 barangay without an open task").toBeDefined();
+  return row;
+}
+
 describe("confirm and reject", () => {
-  async function candidate(api: Api, officer: Client) {
-    const view = await ranking(officer);
-    const tasks = (await officer.get("/api/officer/assignments")).body as { barangayId: number; type: string; status: string }[];
-    const open = new Set(tasks.filter((t) => t.status !== "completed" && t.type === "search_and_destroy").map((t) => t.barangayId));
-    const row = view.barangays.find((b) => b.action === "tier1" && b.team && !open.has(b.barangayId))!;
-    expect(row, "the seed should have a Tier 1 barangay without an open task").toBeDefined();
-    return row;
-  }
 
   it("confirm creates a field task for the barangay's BHW and records the decision", async () => {
     const api = await startApi();
@@ -470,9 +472,12 @@ describe("BHW survey through the API", () => {
     const api = await startApi();
     try {
       const officer = await api.officer();
+      const row = await candidate(api, officer);
+      const confirmed = await officer.post(`/api/officer/barangays/${row.barangayId}/confirm`, { tier: 1, reviewed: true });
+      expect(confirmed.status).toBe(201);
       const tasks = (await officer.get("/api/officer/assignments")).body as { id: number; barangayName: string; status: string }[];
-      const open = tasks.find((t) => t.status === "new")!;
-      expect(open, "the seed should have a task that has not started").toBeDefined();
+      const open = tasks.find((t) => t.id === confirmed.body.taskId)!;
+      expect(open.status).toBe("new");
       const bhw = api.client().withBhwToken(tokenFor(api, open.barangayName));
       const me = (await bhw.get("/api/bhw/me")).body as { puroks: { id: number }[] };
 
@@ -748,10 +753,11 @@ describe("activity and dispatches", () => {
 
   it("lists the field assignments with status, team and households", async () => {
     const tasks = (await officer.get("/api/officer/assignments")).body as { status: string; type: string; bhwName: string; puroks: string[]; households: number }[];
-    expect(tasks.map((t) => t.status).sort()).toEqual(["completed", "in_progress", "new"]);
-    expect(tasks[0].status).toBe("new"); // open ones first
+    expect(tasks.map((t) => t.status).sort()).toEqual(["completed", "in_progress"]);
+    expect(tasks[0].status).toBe("in_progress"); // open ones first
     expect(tasks.every((t) => t.bhwName && Array.isArray(t.puroks))).toBe(true);
-    expect(tasks.find((t) => t.type === "spot_check")!.households).toBe(1);
+    // the two sample assignments carry their surveys: 10 households in Sagpon (finished), 7 in Peñafrancia (in progress)
+    expect(tasks.map((t) => t.households).sort((a, b) => a - b)).toEqual([7, 10]);
   });
 
   it("filters the findings by barangay, BHW and date range", async () => {
@@ -886,7 +892,7 @@ describe("the BHW's list of recent surveys", () => {
     const details = { personsSlept: 5, buildingStructure: "Concrete", storeys: 2, rooms: 3, screened: true };
     const on = await startApi({ shareHouseholdDetails: true });
     try {
-      const { phone, me } = await open(on, "Mabini");
+      const { phone, me } = await open(on, "Sagpon");
       const sent = await phone.post("/api/bhw/surveys", payload(me.puroks[0].id, details));
       const row = (await list(phone)).find((r) => r.id === sent.body.surveyId) as unknown as { household: Record<string, unknown> } & Record<string, unknown>;
       expect(row.household).toEqual({

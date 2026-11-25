@@ -12,6 +12,15 @@ import { addDays } from "../src/util/dates";
 import { count, dataFile, officerId, seededDb } from "./helpers";
 
 const ANCHOR = "2026-11-19";
+
+/** A Tier 1 task that has not started yet, for the BHW given (the sample data only has tasks that are under way or done). */
+function newTask(db: Db, bhw: { id: number; barangayId: number }): number {
+  return Number(
+    db
+      .prepare("INSERT INTO field_task (barangay_id, bhw_id, type, puroks, status) VALUES (?, ?, 'search_and_destroy', '[\"Purok 1\"]', 'new')")
+      .run(bhw.barangayId, bhw.id).lastInsertRowid,
+  );
+}
 const NOON = new Date(`${ANCHOR}T09:00:00.000Z`);
 
 function setup() {
@@ -256,7 +265,7 @@ describe("BHW survey", () => {
     it("is answered with the first result even when the repeat differs or the task has moved on", () => {
       const { db, changes } = setup();
       const jun = bhwOf(db, "Jun M. Santos");
-      const taskId = (db.prepare("SELECT id FROM field_task WHERE bhw_id = ? AND status = 'new'").get(jun.id) as { id: number }).id;
+      const taskId = newTask(db, jun);
       const purokId = getBarangay(db, jun.barangayId)!.puroks[0].id;
       const base = { purokId, houseNo: "3", surveyedBy: jun.displayName, surveyDate: ANCHOR, noContainersFound: true, taskId, clientSubmissionId: ID, completeTask: true };
       const first = changes.submitSurvey(jun.barangayId, base);
@@ -328,7 +337,7 @@ describe("BHW survey", () => {
   it("marks the task in progress, or completed when the BHW says so", () => {
     const { db, changes } = setup();
     const jun = bhwOf(db, "Jun M. Santos");
-    const taskId = (db.prepare("SELECT id FROM field_task WHERE bhw_id = ? AND status = 'new'").get(jun.id) as { id: number }).id;
+    const taskId = newTask(db, jun);
     const purokId = getBarangay(db, jun.barangayId)!.puroks[0].id;
     const base = { purokId, houseNo: "3", surveyedBy: jun.displayName, surveyDate: ANCHOR, noContainersFound: true, taskId };
     changes.submitSurvey(jun.barangayId, base);

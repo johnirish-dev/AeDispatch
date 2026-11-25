@@ -254,63 +254,7 @@ export function seedDatabase(db: Db, opts: SeedOptions): SeedSummary {
     insEvent.run(stamp(startMonday, "07"), "params", `Parameter version ${DEFAULT_PARAMETERS.version} created (default starting values)`, stamp(startMonday, "07"));
     insEvent.run(stamp(anchor, "07"), "weather", `Weather file loaded for ${SAMPLE_MUNICIPALITY} up to ${anchor}`, stamp(anchor, "07"));
 
-    // --- entomological surveys ---------------------------------------------
-    for (let b = 0; b < SAMPLE_BARANGAYS.length; b++) {
-      const bhw = bhwOfBarangay.get(b);
-      for (let w = 0; w < SEED_WEEKS; w++) {
-        const wi = weekIndex(sim, b, w);
-        const count = sim.surveys[wi];
-        if (count === 0) continue;
-        const containerSplit = splitCount(rng, sim.containers[wi], count);
-        const positiveSplit = splitCount(rng, sim.positive[wi], count);
-        for (let k = 0; k < count; k++) {
-          const planned = addDays(weekStart(w), randInt(rng, 0, 6));
-          const date = planned > anchor ? anchor : planned;
-          const total = containerSplit[k];
-          const containers = [];
-          let positiveLeft = Math.min(positiveSplit[k], total);
-          const perRow = splitCount(rng, total, 3);
-          for (const t of perRow) {
-            if (t === 0) continue;
-            const positive = Math.min(t, positiveLeft);
-            positiveLeft -= positive;
-            const withCover = randInt(rng, 0, t);
-            containers.push({
-              location: (rng() < 0.5 ? "indoor" : "outdoor") as "indoor" | "outdoor",
-              containerType: pick(rng, CONTAINER_TYPES),
-              total: t, withCover, withoutCover: t - withCover, positive,
-              larvae: positive * randInt(rng, 5, 40), pupae: positive * randInt(rng, 0, 8),
-            });
-          }
-          const submitted = stamp(date, "16");
-          const survey = db
-            .prepare(
-              `INSERT INTO entomological_survey
-                (task_id, bhw_id, barangay_id, purok_id, house_no, head_of_family, age, sex, civil_status, occupation,
-                 persons_slept, building_structure, storeys, rooms, screened, surveyed_by, survey_date,
-                 no_containers_found, submitted_at, created_at)
-               VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            )
-            .run(
-              bhw ? bhw.id : null, barangayId[b], pick(rng, purokIds[b]), String(randInt(rng, 1, 200)), pick(rng, HEAD_NAMES),
-              randInt(rng, 22, 70), pick(rng, ["Male", "Female"]), pick(rng, ["Single", "Married", "Widowed"]),
-              pick(rng, OCCUPATIONS), randInt(rng, 1, 8), pick(rng, STRUCTURES), randInt(rng, 1, 2), randInt(rng, 1, 5),
-              rng() < 0.4 ? 1 : 0, bhw ? bhw.name : "Barangay Health Worker (sample)", date,
-              containers.length === 0 ? 1 : 0, submitted, submitted,
-            );
-          const surveyId = Number(survey.lastInsertRowid);
-          for (const c of containers) {
-            db.prepare(
-              `INSERT INTO survey_container
-                (survey_id, location, container_type, total, with_cover, without_cover, positive, larvae_count, pupae_count, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            ).run(surveyId, c.location, c.containerType, c.total, c.withCover, c.withoutCover, c.positive, c.larvae, c.pupae, submitted);
-          }
-        }
-      }
-    }
-
-    // --- past decisions, tasks and a completed spot check ------------------
+    // --- past decisions, the two assignments and their surveys ---------------
     // These need a score to point at, so a few sample score rows are written
     // for the past decision dates. Current scores are computed by the ranking
     // service when the server starts.
@@ -349,48 +293,84 @@ export function seedDatabase(db: Db, opts: SeedOptions): SeedSummary {
       );
       insEvent.run(at, "decision", status === "confirmed" ? `Confirmed Tier 1 for ${name}` : `Rejected Tier 1 for ${name}: "${reason}"`, at);
       const bhw = bhwOfBarangay.get(b);
-      if (taskStatus && bhw) {
-        db.prepare(
-          `INSERT INTO field_task (recommendation_id, barangay_id, bhw_id, type, puroks, status, created_at, updated_at)
-           VALUES (?, ?, ?, 'search_and_destroy', ?, ?, ?, ?)`,
-        ).run(recId, barangayId[b], bhw.id, JSON.stringify(taskPuroks), taskStatus, at, at);
-      }
-    };
-    addDecision("Peñafrancia", 3, { weather: 0.72, household: 0.55, symptom: 0.4, field: 0.35, cases: 0.5 }, "confirmed", null, "new", ["Purok 2", "Purok 3"]);
-    addDecision("Busay", 5, { weather: 0.6, household: 0.45, symptom: 0.2, field: 0.3, cases: 0.15 }, "confirmed", null, "in_progress", ["Purok 1", "Purok 3"]);
-    addDecision("Kilicao", 6, { weather: 0.55, household: 0.4, symptom: 0.15, field: 0.25, cases: 0.1 }, "rejected", "Cases still low; recheck after the next weekly report.", null, []);
-
-    // A completed spot check in Sagpon with its submitted survey.
-    const sagpon = SAMPLE_BARANGAYS.findIndex((s) => s.name === "Sagpon");
-    const sagponBhw = bhwOfBarangay.get(sagpon);
-    if (sagponBhw) {
-      const date = addDays(anchor, -4);
-      const submitted = stamp(date, "15");
-      const taskId = Number(
+      if (!taskStatus || !bhw) return null;
+      return Number(
         db
           .prepare(
             `INSERT INTO field_task (recommendation_id, barangay_id, bhw_id, type, puroks, status, created_at, updated_at)
-             VALUES (NULL, ?, ?, 'spot_check', ?, 'completed', ?, ?)`,
+             VALUES (?, ?, ?, 'search_and_destroy', ?, ?, ?, ?)`,
           )
-          .run(barangayId[sagpon], sagponBhw.id, JSON.stringify(["Purok 2"]), stamp(addDays(anchor, -5), "09"), submitted).lastInsertRowid,
+          .run(recId, barangayId[b], bhw.id, JSON.stringify(taskPuroks), taskStatus, at, at).lastInsertRowid,
       );
-      const surveyId = Number(
-        db
-          .prepare(
-            `INSERT INTO entomological_survey
-              (task_id, bhw_id, barangay_id, purok_id, house_no, head_of_family, surveyed_by, survey_date,
-               no_containers_found, submitted_at, created_at)
-             VALUES (?, ?, ?, ?, '47', 'M. Flores', ?, ?, 0, ?, ?)`,
-          )
-          .run(taskId, sagponBhw.id, barangayId[sagpon], purokIds[sagpon][1], sagponBhw.name, date, submitted, submitted).lastInsertRowid,
-      );
-      db.prepare(
-        `INSERT INTO survey_container
-          (survey_id, location, container_type, total, with_cover, without_cover, positive, larvae_count, pupae_count, created_at)
-         VALUES (?, 'outdoor', 'Drum', 4, 1, 3, 1, 12, 2, ?)`,
-      ).run(surveyId, submitted);
-      insEvent.run(submitted, "submission", `Spot check submitted for Sagpon`, submitted);
-    }
+    };
+    // The field work in the sample: only two barangays, each with a Tier 1 assignment and the household surveys
+    // done for it (every survey belongs to its task and has its own log line). The other barangays have no field work
+    // yet, so a task can be confirmed and surveyed live during a demonstration.
+    const sagponTask = addDecision("Sagpon", 9, { weather: 0.7, household: 0.6, symptom: 0.45, field: 0.4, cases: 0.55 }, "confirmed", null, "in_progress", ["Purok 1", "Purok 2", "Purok 4"]);
+    const penaTask = addDecision("Peñafrancia", 4, { weather: 0.72, household: 0.55, symptom: 0.4, field: 0.35, cases: 0.5 }, "confirmed", null, "in_progress", ["Purok 1", "Purok 2", "Purok 3"]);
+    addDecision("Kilicao", 6, { weather: 0.55, household: 0.4, symptom: 0.15, field: 0.25, cases: 0.1 }, "rejected", "Cases still low; recheck after the next weekly report.", null, []);
+
+    const insSurvey = db.prepare(
+      `INSERT INTO entomological_survey
+        (task_id, bhw_id, barangay_id, purok_id, house_no, head_of_family, age, sex, civil_status, occupation,
+         persons_slept, building_structure, storeys, rooms, screened, surveyed_by, survey_date,
+         no_containers_found, submitted_at, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    );
+    const insContainer = db.prepare(
+      `INSERT INTO survey_container
+        (survey_id, location, container_type, total, with_cover, without_cover, positive, larvae_count, pupae_count, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    );
+    /**
+     * The households surveyed for one task: `days` lists, for each household, how many days before the sample date it
+     * was surveyed (oldest first); `positiveRate` is how often a container row holds larvae.
+     */
+    const surveyTask = (name: string, taskId: number | null, puroks: string[], days: number[], positiveRate: number, completed: boolean) => {
+      const b = SAMPLE_BARANGAYS.findIndex((s) => s.name === name);
+      const bhw = bhwOfBarangay.get(b);
+      if (taskId === null || !bhw) return;
+      const purokRows = db.prepare("SELECT id, name FROM purok WHERE barangay_id = ? ORDER BY id").all(barangayId[b]) as { id: number; name: string }[];
+      const heads = [...HEAD_NAMES];
+      const houses = new Set<string>();
+      let last = "";
+      days.forEach((daysAgo, k) => {
+        const date = addDays(anchor, -daysAgo);
+        const submitted = stamp(date, String(1 + (k % 7)).padStart(2, "0")); // 09:00 to 15:00 in Manila (the stamps are UTC)
+        const purok = purokRows.find((p) => p.name === puroks[k % puroks.length])!;
+        let house = String(randInt(rng, 1, 220));
+        while (houses.has(house)) house = String(randInt(rng, 1, 220));
+        houses.add(house);
+        const head = heads.splice(randInt(rng, 0, heads.length - 1), 1)[0] ?? pick(rng, HEAD_NAMES);
+        const rows = [];
+        const rowCount = randInt(rng, 1, 3);
+        for (let r = 0; r < rowCount; r++) {
+          const total = randInt(rng, 1, 6);
+          const positive = rng() < positiveRate ? randInt(rng, 1, Math.min(3, total)) : 0;
+          const withCover = randInt(rng, 0, total);
+          rows.push({
+            location: (rng() < 0.5 ? "indoor" : "outdoor") as "indoor" | "outdoor",
+            containerType: pick(rng, CONTAINER_TYPES),
+            total, withCover, withoutCover: total - withCover, positive,
+            larvae: positive * randInt(rng, 5, 40), pupae: positive * randInt(rng, 0, 8),
+          });
+        }
+        const surveyId = Number(
+          insSurvey.run(
+            taskId, bhw.id, barangayId[b], purok.id, house, head, randInt(rng, 22, 70), pick(rng, ["Male", "Female"]),
+            pick(rng, ["Single", "Married", "Widowed"]), pick(rng, OCCUPATIONS), randInt(rng, 1, 8), pick(rng, STRUCTURES),
+            randInt(rng, 1, 2), randInt(rng, 1, 5), rng() < 0.4 ? 1 : 0, bhw.name, date, 0, submitted, submitted,
+          ).lastInsertRowid,
+        );
+        for (const c of rows) insContainer.run(surveyId, c.location, c.containerType, c.total, c.withCover, c.withoutCover, c.positive, c.larvae, c.pupae, submitted);
+        // the same words the server writes when a BHW submits
+        insEvent.run(submitted, "submission", `Survey submitted for ${name} (${purok.name})`, submitted);
+        last = submitted;
+      });
+      db.prepare("UPDATE field_task SET status = ?, updated_at = ? WHERE id = ?").run(completed ? "completed" : "in_progress", last, taskId);
+    };
+    surveyTask("Sagpon", sagponTask, ["Purok 1", "Purok 2", "Purok 4"], [8, 8, 7, 7, 6, 6, 5, 5, 4, 4], 0.55, true);
+    surveyTask("Peñafrancia", penaTask, ["Purok 1", "Purok 2", "Purok 3"], [3, 3, 2, 2, 2, 1, 1], 0.4, false);
   })();
 
   const counts: Record<string, number> = {};

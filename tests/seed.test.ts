@@ -31,7 +31,7 @@ describe("seed", () => {
     expect(count(db, "case_import")).toBe(8);
     expect(count(db, "symptom_count")).toBe(8 * 53); // 53 days from 2026-09-14 to 2026-11-05
     expect(count(db, "model_parameters")).toBe(1);
-    expect(count(db, "entomological_survey")).toBeGreaterThan(20);
+    expect(count(db, "entomological_survey")).toBe(17); // field work only in Sagpon (10) and Peñafrancia (7)
     expect(count(db, "daily_answer")).toBeGreaterThan(1000);
   });
 
@@ -98,7 +98,10 @@ describe("seed", () => {
     expect(rejected.reason.length).toBeGreaterThanOrEqual(10);
 
     const taskStatuses = (db.prepare("SELECT status FROM field_task ORDER BY id").all() as { status: string }[]).map((r) => r.status);
-    expect(taskStatuses.sort()).toEqual(["completed", "in_progress", "new"]);
+    expect(taskStatuses.sort()).toEqual(["completed", "in_progress"]);
+    // every sample survey belongs to its task, and each has its own log line
+    expect((db.prepare("SELECT COUNT(*) AS n FROM entomological_survey WHERE task_id IS NULL").get() as { n: number }).n).toBe(0);
+    expect(listEvents(db, 200).filter((e) => e.type === "submission")).toHaveLength(17);
     expect(listTasksForBarangay(db, 1).length).toBeGreaterThanOrEqual(1);
     expect(listEvents(db, 100).map((e) => e.type)).toContain("submission");
   });
