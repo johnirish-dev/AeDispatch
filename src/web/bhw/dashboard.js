@@ -56,10 +56,9 @@ export async function renderDashboard(root) {
   };
 
   root.innerHTML = `
-    <div class="bhw-topbar">
+    <div class="bhw-topbar bhw-dashboard-topbar">
       <div>
         <h1 class="bhw-page-title">Dashboard</h1>
-        <p class="bhw-page-subtitle">${submittedCount} household${submittedCount === 1 ? '' : 's'} submitted${openTasks.length > 0 ? ` · ${openTasks.length} active task${openTasks.length === 1 ? '' : 's'}` : ''}</p>
       </div>
       <div class="bhw-clock-pill">
         <span class="bhw-dot-green"></span>
@@ -95,23 +94,23 @@ export async function renderDashboard(root) {
 
     <div class="bhw-dashboard-split">
       <section class="bhw-panel">
-        <div class="bhw-panel-header">
+        <div class="bhw-panel-header bhw-puroks-panel-header">
           <div>
             <h2 class="bhw-panel-title">Barangay puroks</h2>
-            <p class="bhw-panel-sub">Households surveyed per purok during the current field window</p>
+            <p class="bhw-panel-sub">Households surveyed per purok</p>
           </div>
-          <a href="#/survey" class="bhw-pill-btn primary" title="Start a new Dengue Form 5 household survey">${icon('plus', 14)} New household survey</a>
+          <a href="#/survey" class="bhw-pill-btn primary sm bhw-new-survey-btn" title="Start a new Dengue Form 5 household survey">${icon('plus', 14)} New survey</a>
         </div>
         <div id="puroks-list"></div>
       </section>
 
       <section class="bhw-panel">
-        <div class="bhw-panel-header">
+        <div class="bhw-panel-header bhw-recent-forms-panel-header">
           <div>
             <h2 class="bhw-panel-title">Recent forms</h2>
             <p class="bhw-panel-sub">Latest household entries</p>
           </div>
-          <a href="#/forms" class="bhw-pill-btn outline sm" title="View all forms">View all</a>
+          <a href="#/forms" class="bhw-pill-btn outline sm bhw-view-all-btn" title="View all forms">View all</a>
         </div>
         <div id="recent-forms-list"></div>
       </section>

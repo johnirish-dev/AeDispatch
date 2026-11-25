@@ -2,9 +2,11 @@ import { Store } from './store.js';
 import { renderDashboard } from './dashboard.js';
 import { renderSurvey } from './survey.js';
 import { renderMyForms } from './forms.js';
+import { showModal } from './alerts.js';
 
 export function initRouter(appRoot) {
   const navIds = ['home', 'survey', 'forms'];
+  let currentHash = window.location.hash || '#/';
 
   function updateNav(activeId) {
     navIds.forEach(id => {
@@ -13,8 +15,7 @@ export function initRouter(appRoot) {
     });
   }
 
-  async function route() {
-    const hash = window.location.hash;
+  async function route(hash = window.location.hash || '#/') {
     appRoot.innerHTML = ''; 
 
     if (hash === '' || hash === '#' || hash === '#/') {
@@ -30,8 +31,39 @@ export function initRouter(appRoot) {
     } else {
       window.location.hash = '#/';
     }
+    currentHash = hash;
   }
 
-  window.addEventListener('hashchange', route);
-  route(); 
+  async function handleHashChange() {
+    const nextHash = window.location.hash || '#/';
+    const guard = window.bhwSurveyExitGuard;
+    const leavingSurvey = currentHash.startsWith('#/survey') && !nextHash.startsWith('#/survey');
+
+    if (guard && leavingSurvey && guard.isDirty()) {
+      window.history.replaceState({}, '', currentHash);
+      const choice = await showModal({
+        type: 'warning',
+        title: 'Unsaved changes',
+        message: 'Save your progress to finish later, or discard this survey before leaving.',
+        mobileMessage: 'Save your progress to finish later, or discard this survey.',
+        dismissible: false,
+        actions: [
+          { label: 'Save draft', value: 'save', primary: true },
+          { label: 'Discard changes', value: 'discard', danger: true },
+          { label: 'Keep editing', value: 'keep' }
+        ]
+      });
+
+      if (choice === 'keep' || choice === null) return;
+      if (choice === 'save' && !guard.saveAndExit()) return;
+      if (choice === 'discard') guard.discard();
+    }
+
+    if (leavingSurvey) delete window.bhwSurveyExitGuard;
+    window.history.replaceState({}, '', nextHash);
+    await route(nextHash);
+  }
+
+  window.addEventListener('hashchange', handleHashChange);
+  route(currentHash);
 }
