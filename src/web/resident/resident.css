@@ -1447,3 +1447,37 @@ input:focus-visible,
     scroll-behavior: auto !important;
   }
 }
+
+
+/* Confirm: change your barangay */
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(16, 32, 48, 0.55);
+}
+
+.confirm-overlay[hidden] {
+  display: none;
+}
+
+.confirm-card {
+  width: 100%;
+  max-width: 360px;
+  display: grid;
+  gap: 10px;
+  padding: 20px;
+  border-radius: var(--res-radius);
+  background: var(--res-surface);
+  box-shadow: 0 12px 32px rgba(16, 32, 48, 0.28);
+}
+
+.confirm-actions {
+  display: grid;
+  gap: 10px;
+  margin-top: 6px;
+}
